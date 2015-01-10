@@ -68,12 +68,22 @@ def handle_privmsg(sock,line,state_change,state_file):
 	
 	success,cmd,tmp=get_token(line,' ')
 	
+	cmd_esc='+'
+	
+	if(cmd.startswith(bot_nick)):
+		success,cmd,tmp=get_token(tmp,' ')
+		cmd=(cmd_esc+cmd)
+	
 	#check if this was a bot command
-	if(cmd=='+wut'):
+	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
 		output=markov.generate(state_change)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
-	elif(cmd=='+help'):
-		py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot, use +wut to generate text.  That is the only supported feature currently (I might add unit conversions or something later).  ')
+	elif(cmd==(cmd_esc+'help')):
+		py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
+		py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut  -> generate text based on markov chains')
+		py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help -> displays this command list')
+	elif(cmd.startswith(cmd_esc)):
+		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
 		state_change=markov.chain_from(line,state_change,prefix=['',''])
@@ -85,9 +95,7 @@ def handle_server_line(sock,line,state_change,state_file):
 	if(line==''):
 		return
 	
-	#verbose debug
-	print(line)
-	
+	#PONG back when we get a PING; this is needed for keepalive functionality
 	if(line.startswith('PING')):
 		success,ping,msg=get_token(line,' :')
 		if(success):
@@ -99,6 +107,10 @@ def handle_server_line(sock,line,state_change,state_file):
 	
 	success,server_name,line=get_token(line,' ')
 	success,server_cmd,line=get_token(line,' ')
+	
+	#verbose debug
+	if(server_cmd!='PRIVMSG'):
+		print(line)
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
