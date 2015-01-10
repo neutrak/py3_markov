@@ -1,0 +1,5 @@
+A simple markov chain, written in python 3
+
+The real purpose of this is to run on RSS feeds, but I intend to make it generic enough that it can learn from IRC logs, textbooks, etc.
+
+
