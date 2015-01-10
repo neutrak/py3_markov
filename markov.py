@@ -88,7 +88,6 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False):
 		state_change.append(new_state)
 		#note that python's Timsort algorithm makes use of already-sorted sublists,
 		#so this should be relatively fast
-#		state_change=sorted(state_change,key=lambda x:x.prefix)
 		state_change.sort(key=lambda x:x.prefix)
 		
 		"""
@@ -185,7 +184,7 @@ def save_state_change_to_file(state_change,filename):
 	fp.close()
 	return
 
-#reads the state change from a file it was previously read from
+#reads the state change from a file it was previously written to
 def read_state_change_from_file(filename):
 	state_change=[]
 	
@@ -231,8 +230,6 @@ if(__name__=='__main__'):
 	prefix=[]
 	for i in range(0,prefix_len):
 		prefix.append('')
-	
-#	print('main debug 0, prefix='+str(prefix))
 	
 	state_file=None
 	
