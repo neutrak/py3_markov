@@ -78,7 +78,6 @@ def handle_privmsg(sock,line,state_change,state_file):
 	else:
 		state_change=markov.chain_from(line,state_change,prefix=['',''])
 		markov.save_state_change_to_file(state_change,state_file)
-		pass
 	
 
 def handle_server_line(sock,line,state_change,state_file):
