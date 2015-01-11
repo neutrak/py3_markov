@@ -5,9 +5,9 @@ import markov
 import random
 
 bot_nick='confuseus'
-autojoin_channels=['#imgurians','#imgurians-tech']
+#autojoin_channels=['#imgurians','#imgurians-tech']
+autojoin_channels=['#imgurians-tech']
 host='us.ircnet.org'
-#host='daemonic.foonetic.net'
 port=6667
 
 buffer_size=1024

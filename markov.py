@@ -137,7 +137,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 			break
 	
 	if(verbose_dbg):
-		print('markov.generate debug 0, got '+len(transition_states)+' transition states for prefix '+str(prefix))
+		print('markov.generate debug 0, got '+str(len(transition_states))+' transition states for prefix '+str(prefix))
 	
 	#no transition state was found (nothing with that prefix),
 	#return accumulator now
