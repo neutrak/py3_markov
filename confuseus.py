@@ -5,8 +5,8 @@ import markov
 import random
 
 bot_nick='confuseus'
-#autojoin_channels=['#imgurians','#imgurians-tech']
-autojoin_channels=['#imgurians-tech']
+autojoin_channels=['#imgurians','#imgurians-tech']
+#autojoin_channels=['#imgurians-tech'] #testing
 host='us.ircnet.org'
 port=6667
 
@@ -45,6 +45,22 @@ def get_token(text,delimiter):
 			success=True
 	
 	return (success,token,text)
+
+#unit conversion deg F to deg C
+def f_to_c(f):
+	return (5.0/9.0)*(f-32)
+
+#unit conversion deg C to deg F
+def c_to_f(c):
+	return ((9.0/5.0)*c)+32
+
+#unit conversion feet to meters
+def ft_to_m(ft):
+	return ft*0.3048
+
+#unit conversion meters to feet
+def m_to_ft(m):
+	return m*3.281
 
 def handle_privmsg(sock,line,state_change,state_file):
 	#get some information (user, nick, host, etc.)
@@ -102,9 +118,13 @@ def handle_privmsg(sock,line,state_change,state_file):
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut  -> generate text based on markov chains')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help -> displays this command list')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part -> parts current channel (you can invite to me get back)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut   -> generate text based on markov chains')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help  -> displays this command list')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part  -> parts current channel (you can invite to me get back)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c  -> converts temperature from deg F to deg C')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f  -> converts temperature from deg C to deg F')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft -> converts length from meters to feet')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m -> converts length from feet to meters')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
 			
@@ -113,6 +133,34 @@ def handle_privmsg(sock,line,state_change,state_file):
 			py3sendln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
+	elif(cmd==(cmd_esc+'f->c')):
+		try:
+			f=float(line_post_cmd)
+			c=f_to_c(f)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(f)+' degrees F is '+str(c)+' degrees C')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
+	elif(cmd==(cmd_esc+'c->f')):
+		try:
+			c=float(line_post_cmd)
+			f=c_to_f(c)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(c)+' degrees C is '+str(f)+' degrees F')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
+	elif(cmd==(cmd_esc+'m->ft')):
+		try:
+			m=float(line_post_cmd)
+			ft=m_to_ft(m)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(m)+' meters is '+str(ft)+' feet')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
+	elif(cmd==(cmd_esc+'ft->m')):
+		try:
+			ft=float(line_post_cmd)
+			m=ft_to_m(ft)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(ft)+' feet is '+str(m)+' meters')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
 	elif(cmd.startswith(cmd_esc)):
 		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
