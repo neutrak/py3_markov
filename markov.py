@@ -49,16 +49,135 @@ def next_token(text):
 	#and return whatever we got, along with the remainder
 	return (token,text[chars_used:])
 
+#TODO: fix this binary search to be faster,
+#it's algorithmically fast (O(log(n)))
+#but it does a lot of checks and there's probably some better way to do some of it
+
+#find the index of the first element with the given prefix
+#if a suffix is given, checks for that too
+#if the prefix was not found, returns the index it should go at
+#the success element in the returned tuple specifies whether or not the prefix was found
+def binsearch_states(state_change,min_idx,max_idx,prefix,suffix=None):
+#	print('binsearch_states debug 0, len(state_change)='+str(len(state_change))+', min_idx='+str(min_idx)+', max_idx='+str(max_idx))
+	
+	success=False
+	
+	#if there are no elements,
+	#then all new elements get inserted at 0
+	#and we didn't find anything, no matter what it was
+	if(len(state_change)==0):
+		return (success,0)
+	
+	#if we restricted the range to a single element,
+	#then check against that
+	if(min_idx==max_idx):
+#		print('binsearch_states debug 0.5, min_idx==max_idx at '+str(min_idx))
+		
+		#if we succeeded in a binary search for the prefix
+		if(prefix==state_change[min_idx].prefix):
+			#if there was no suffix specified, then we're done
+			if(suffix==None):
+				success=True
+			#otherwise we have to find the correct spot for that suffix
+			else:
+#				print('binsearch_states debug 1, searching for suffix '+suffix+' starting at index '+str(min_idx))
+				
+				#do a linear search for the suffix among elements which share the same prefix
+				#this is slower than a binary search, but simpler,
+				#and the number of elements which share a prefix should be small
+				#relative to the whole state change
+				while(min_idx<len(state_change) and prefix==state_change[min_idx].prefix and suffix>state_change[min_idx].suffix):
+					min_idx+=1
+				
+				if(min_idx<len(state_change)):
+					if(suffix==state_change[min_idx].suffix):
+						success=True
+		#if we are larger than this prefix, then insert after it
+		elif(prefix>state_change[min_idx].prefix):
+#			print('binsearch_states debug 1.5, min_idx='+str(min_idx))
+			min_idx+=1
+		#implicitly, if we are not equal or larger,
+		#then we must be smaller than the array element prefix
+		#in this case, insert at min_idx (before the array element), so no else case is needed here
+		
+		return (success,min_idx)
+	#if there was a range, but the range all has the same prefix,
+	#then go to the minimum of the range (after which we will hit the above if)
+	elif(state_change[min_idx].prefix==state_change[max_idx].prefix):
+		return binsearch_states(state_change,min_idx,min_idx,prefix,suffix)
+	#if the range is only a single entry, then guess_idx will end up at an endpoint
+	#because of that, we need to return here somehow
+	elif(max_idx-min_idx==1):
+#		print('binsearch_states debug 2, restricted range to ['+str(min_idx)+','+str(max_idx)+']')
+		if(prefix<state_change[min_idx].prefix):
+			return (success,min_idx)
+		elif(prefix>state_change[max_idx].prefix):
+			return (success,max_idx+1)
+		elif(prefix==state_change[min_idx].prefix):
+			return binsearch_states(state_change,min_idx,min_idx,prefix,suffix)
+		elif(prefix==state_change[max_idx].prefix):
+			if(suffix==None):
+				success=True
+			else:
+				if(suffix>state_change[max_idx].suffix):
+					max_idx+=1
+				elif(suffix==state_change[max_idx].suffix):
+					success=True
+			return (success,max_idx)
+		else:
+			return (success,max_idx)
+		
+	
+	
+	#take a guess at the middle
+	guess_idx=int((min_idx+max_idx)/2)
+	
+	#restrict the range in a binary-search type way
+	
+	if(prefix<state_change[guess_idx].prefix):
+		return binsearch_states(state_change,min_idx,guess_idx,prefix,suffix)
+	elif(prefix>state_change[guess_idx].prefix):
+		return binsearch_states(state_change,guess_idx,max_idx,prefix,suffix)
+	
+	#if we got here and didn't return,
+	#then we found the prefix at the guess_idx value
+	#so linearly go back until we get to the first thing with that prefix, then return
+	while(guess_idx>=0 and prefix==state_change[guess_idx].prefix):
+		guess_idx-=1
+	if(prefix!=state_change[guess_idx].prefix):
+		guess_idx+=1
+	
+	#because we already have a nice base return case if min_idx==max_idx, we'll use that
+	return binsearch_states(state_change,guess_idx,guess_idx,prefix,suffix)
+	
+
+def output_states(state_change):
+	print('[')
+	for state in state_change:
+		print('{ prefix:'+str(state.prefix)+', suffix:'+str(state.suffix)+', count:'+str(state.count)+' }')
+	print(']')
+	print('')
+
+def is_state_sorted(state_change):
+	for i in range(0,len(state_change)-2):
+		if(state_change[i].prefix>state_change[i+1].prefix):
+			print('Err: states not sorted (prefix error) (element '+str(i)+')')
+			return False
+		elif(state_change[i].prefix==state_change[i+1].prefix):
+			if(state_change[i].suffix>state_change[i+1].suffix):
+				print('Err: states not sorted (suffix error) (element '+str(i)+')')
+				return False
+	return True
+
 #add the given text to the chain
 #the text follows from the given prefix
 #the initial prefix consists of null strings
 #the length of the prefix array is used throughout the chain
-def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False):
+def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorted=False):
 	token,text=next_token(text)
 	
 	if(verbose_dbg):
 		print('chain_from debug 0, prefix='+str(prefix)+', token='+token)
-		print('chain_from debug 1, len(state_change)='+str(len(state_change)))
 	
 	#if the token was empty, then we hit the end of the text
 	#this is the base case to end recursion
@@ -67,41 +186,43 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False):
 	
 	transition_found=False
 	
-	#TODO: find possible states with a binary search, since state_change is ordered by prefix
-	
-	#find the state change entry for our prefix and update it
-	for state in state_change:
-		if(state.prefix==prefix):
-			if(state.suffix==token):
-				state.count+=1
-				transition_found=True
-				break
-		#because state_change is sorted by prefix,
-		#as soon as we find an entry with a larger prefix,
-		#we can stop looking
-		elif(state.prefix>prefix):
-			break
-	
-	#if the prefix-suffix combination doesn't exist, then make it now
-	if(not transition_found):
+	#do a binary search to find this state
+	#(or, if not found, to find where it should go)
+	success,ins_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,token)
+	if(success):
+		#found state, just update the count
+		state_change[ins_idx].count+=1
+	else:
+		#didn't find state, inserting at index ins_idx
 		new_state=state_transition(prefix,token)
+#		state_change=state_change[0:ins_idx]+[new_state]+state_change[ins_idx:]
+		state_change.insert(ins_idx,new_state)
+	
+	if(verbose_dbg):
+		print('chain_from debug 1, curren state_change array is: ')
+		output_states(state_change)
 		
-		#insert in order, so we can run faster later by depending on the ordered property
-		state_change.append(new_state)
-		#note that python's Timsort algorithm makes use of already-sorted sublists,
-		#so this should be relatively fast
-		state_change.sort(key=lambda x:x.prefix)
-		
-		"""
-		#insert in order, so we can run faster later by depending on the ordered property
-		ins_idx=0
-		while((ins_idx<len(state_change)) and (new_state.prefix<state_change[ins_idx].prefix)):
-			ins_idx+=1
-		new_state_change=state_change[0:ins_idx]+[new_state]+state_change[ins_idx:]
-		state_change=new_state_change
-		"""
-		
-#		print('chain_from debug 1, new state_change is '+str(state_change))
+	#this check is super expensive so it's only done when asked
+	#I verified on 5000 lines test data that it works, but there might be some weird case I missed
+	#I also fed in 50000 lines without checking sorting,
+	#then checked sorting on the resulting state file and it was right,
+	#so I'm like 95% confident in its ability
+	if(check_sorted):
+		if(not is_state_sorted(state_change)):
+#			print('Err: states are NOT properly sorted, this program will FAIL!!!!')
+#			print('state change array is: ')
+#			output_states(state_change)
+#			exit(1)
+			
+			print('Warn: states are NOT properly sorted; sorting manually to correct the problem...')
+			print('Warn (continued): If the data has been this way for a while it may now be invalid and have duplicates etc.')
+			print('state change array (pre-sort) was: ')
+			output_states(state_change)
+			
+			#this can be done in two sorts because python list sort is guaranteed stable
+			state_change.sort(key=lambda state:state.suffix)
+			state_change.sort(key=lambda state:state.prefix)
+			
 	
 	#update the prefix for the next token
 	prefix=[prefix[1],token]
@@ -124,6 +245,10 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#total count of all states that come from the given prefix
 	#this is used so we can calculate probabilities based on state counts
 	prefix_count=0
+	
+	#TODO: replace this short-circuiting linear search
+	#with a call to binary search to get the index of the first element with the given prefix
+	#and then go linear from there until a different prefix is found
 	
 	transition_states=[]
 	for state in state_change:

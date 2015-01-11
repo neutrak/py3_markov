@@ -117,7 +117,7 @@ def handle_privmsg(sock,line,state_change,state_file):
 		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
-		state_change=markov.chain_from(line,state_change,prefix=['',''])
+		state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=True)
 		markov.save_state_change_to_file(state_change,state_file)
 	
 
