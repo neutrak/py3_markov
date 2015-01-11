@@ -189,7 +189,7 @@ def handle_server_line(sock,line,state_change,state_file):
 	
 	#verbose debug
 	if(server_cmd!='PRIVMSG'):
-		print(line)
+		print(server_name+' '+server_cmd+' '+line)
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
