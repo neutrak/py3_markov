@@ -71,7 +71,7 @@ def handle_privmsg(sock,line,state_change,state_file):
 	
 	success,cmd,line_post_cmd=get_token(line,' ')
 	
-	cmd_esc='+'
+	cmd_esc='^'
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
