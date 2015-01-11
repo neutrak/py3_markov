@@ -5,7 +5,7 @@ import markov
 import random
 
 bot_nick='confuseus'
-autojoin_channels=['#imgurians']
+autojoin_channels=['#imgurians','#imgurians-tech']
 host='us.ircnet.org'
 #host='daemonic.foonetic.net'
 port=6667
@@ -79,11 +79,11 @@ def handle_privmsg(sock,line,state_change,state_file):
 		print('Chose a random word to start from ('+words[rand_word_idx]+')')
 		
 		#try to use a word from the user
-		output=markov.generate(state_change,prefix=['',words[rand_word_idx]])
+		output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx])
 		
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
-		if(output==''):
+		if(output=='' or output==words[rand_word_idx]):
 			output=markov.generate(state_change)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
