@@ -64,23 +64,28 @@ def handle_privmsg(sock,line,state_change,state_file):
 	
 	#if they PM'd us, then PM 'em right back
 	#that'll show 'em
+	is_pm=False
 	if(channel==bot_nick):
+		is_pm=True
 		channel=nick
 	
-	success,cmd,tmp=get_token(line,' ')
+	success,cmd,line_post_cmd=get_token(line,' ')
 	
 	cmd_esc='+'
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
+		output=''
+		
 		#pick a random word the user said and start generating from there
-		words=line.split(' ')
-		rand_word_idx=random.randint(0,len(words)-1)
-		print('Chose a random word to start from ('+words[rand_word_idx]+')')
-		
-		#try to use a word from the user
-		output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx])
-		
+		words=line_post_cmd.split(' ')
+		if(len(words)>0):
+			rand_word_idx=random.randint(0,len(words)-1)
+			print('Chose a random word to start from ('+words[rand_word_idx]+')')
+			
+			#try to use a word from the user
+			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx])
+			
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
 		if(output=='' or output==words[rand_word_idx]):
@@ -95,9 +100,19 @@ def handle_privmsg(sock,line,state_change,state_file):
 		output=markov.generate(state_change)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 	elif(cmd==(cmd_esc+'help')):
-		py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
-		py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut  -> generate text based on markov chains')
-		py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help -> displays this command list')
+		if(is_pm):
+			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut  -> generate text based on markov chains')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help -> displays this command list')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part -> parts current channel (you can invite to me get back)')
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
+			
+	elif(cmd==(cmd_esc+'part')):
+		if(not is_pm):
+			py3sendln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)')
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
 	elif(cmd.startswith(cmd_esc)):
 		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
@@ -141,7 +156,8 @@ def handle_server_line(sock,line,state_change,state_file):
 		handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file)
 	#got an invite, so join
 	elif(server_cmd=='INVITE'):
-		pass
+		succcesss,name,channel=get_token(line,' :')
+		py3sendln(sock,'JOIN :'+channel)
 	
 
 def main(state_file='state_file.txt'):
