@@ -67,6 +67,8 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False):
 	
 	transition_found=False
 	
+	#TODO: find possible states with a binary search, since state_change is ordered by prefix
+	
 	#find the state change entry for our prefix and update it
 	for state in state_change:
 		if(state.prefix==prefix):
@@ -111,7 +113,7 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False):
 #default prefix of ['',''] generates from starting states
 #note that because this is recursive and python doesn't TCO,
 #word_limit must be less than max recursion depth
-def generate(state_change=[],prefix=['',''],word_limit=40,acc=''):
+def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True):
 	#trim leading whitespace just to be pretty
 	acc=acc.lstrip(' ')
 	
@@ -134,6 +136,8 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc=''):
 		elif(state.prefix>prefix):
 			break
 	
+	if(verbose_dbg):
+		print('markov.generate debug 0, got '+len(transition_states)+' transition states for prefix '+str(prefix))
 	
 	#no transition state was found (nothing with that prefix),
 	#return accumulator now
