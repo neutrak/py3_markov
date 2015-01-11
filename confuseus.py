@@ -2,6 +2,7 @@
 
 from socket import *
 import markov
+import random
 
 bot_nick='confuseus'
 autojoin_channels=['#imgurians']
@@ -70,9 +71,24 @@ def handle_privmsg(sock,line,state_change,state_file):
 	
 	cmd_esc='+'
 	
+	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
-		success,cmd,tmp=get_token(tmp,' ')
-		cmd=(cmd_esc+cmd)
+		#pick a random word the user said and start generating from there
+		words=line.split(' ')
+		rand_word_idx=random.randint(0,len(words)-1)
+		print('Chose a random word to start from ('+words[rand_word_idx]+')')
+		
+		#try to use a word from the user
+		output=markov.generate(state_change,prefix=['',words[rand_word_idx]])
+		
+		#if it didn't have that word as a starting state,
+		#then just go random (fall back functionality)
+		if(output==''):
+			output=markov.generate(state_change)
+		
+		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		return
+		
 	
 	#check if this was a bot command
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
