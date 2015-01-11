@@ -15,7 +15,10 @@ buffer_size=1024
 #send a string to a socket in python3
 #s is the socket
 def py3send(s,message):
-	s.send(message.encode('latin-1'))
+	try:
+		s.send(message.encode('latin-1'))
+	except UnicodeEncodeError:
+		print('Err: Unicode to latin-1 conversion error, ignoring message '+str(message))
 
 def py3sendln(s,message):
 	#debug
