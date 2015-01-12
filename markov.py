@@ -246,12 +246,16 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#this is used so we can calculate probabilities based on state counts
 	prefix_count=0
 	
-	#TODO: replace this short-circuiting linear search
-	#with a call to binary search to get the index of the first element with the given prefix
-	#and then go linear from there until a different prefix is found
+	#binary search for this prefix, so we get all the valid transitions quickly
+	success,start_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,suffix=None)
+	
+	#if the prefix wasn't found, then there are no transitions left
+	if(not success):
+		start_idx=len(state_change)
 	
 	transition_states=[]
-	for state in state_change:
+	for state_idx in range(start_idx,len(state_change)):
+		state=state_change[state_idx]
 		if(state.prefix==prefix):
 			transition_states.append(state)
 			prefix_count+=(state.count)
@@ -382,6 +386,8 @@ if(__name__=='__main__'):
 		except EOFError:
 			in_line=''
 			break
+		except UnicodeDecodeError:
+			continue
 	
 	print('learning...')
 	
