@@ -28,8 +28,12 @@ def py3sendln(s,message):
 
 #receive a string in python3
 def py3recv(s,byte_count):
-	data=s.recv(byte_count)
-	return data.decode('utf-8')
+	try:
+		data=s.recv(byte_count)
+		return data.decode('utf-8')
+	except UnicodeDecodeError:
+		print('Err: latin-1 to Unicode conversion error, ignoring this line')
+	return ''
 
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
@@ -65,7 +69,7 @@ def ft_to_m(ft):
 def m_to_ft(m):
 	return m*3.281
 
-def handle_privmsg(sock,line,state_change,state_file):
+def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	#get some information (user, nick, host, etc.)
 	success,info,line=get_token(line,' ')
 	info=info.lstrip(':')
@@ -111,7 +115,7 @@ def handle_privmsg(sock,line,state_change,state_file):
 			output=markov.generate(state_change)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
-		return
+		return (lines_since_write,lines_since_sort_chk)
 		
 	
 	#check if this was a bot command
@@ -168,21 +172,43 @@ def handle_privmsg(sock,line,state_change,state_file):
 		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
-		state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=True)
-		markov.save_state_change_to_file(state_change,state_file)
+		#if this was a pm then let the user know how to get help if they want it
+		if(is_pm):
+			py3sendln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)')
+		
+		#writing back to the state file and checking the sorting are expensive operations
+		#as such, they're not done every line, but only every n lines, as specified here
+		
+		lines_since_write+=1
+		lines_since_sort_chk+=1
+		
+		check_sorted=False
+		if(lines_since_sort_chk>=20):
+			check_sorted=True
+			lines_since_sort_chk=0
+		
+		state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=check_sorted)
+		
+		if(lines_since_write>=60):
+			markov.save_state_change_to_file(state_change,state_file)
+			lines_since_write=0
+	
+	return (lines_since_write,lines_since_sort_chk)
 	
 
-def handle_server_line(sock,line,state_change,state_file):
+def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
+#	print('handle_server_line debug 0, got line '+line+', len(state_change)='+str(len(state_change))+', state_file='+state_file+', lines_since_write='+str(lines_since_write)+', lines_since_sort_chk='+str(lines_since_sort_chk))
+	
 	#ignore blank lines
 	if(line==''):
-		return
+		return (lines_since_write,lines_since_sort_chk)
 	
 	#PONG back when we get a PING; this is needed for keepalive functionality
 	if(line.startswith('PING')):
 		success,ping,msg=get_token(line,' :')
 		if(success):
 			py3sendln(sock,'PONG :'+msg)
-		return
+		return (lines_since_write,lines_since_sort_chk)
 	#error, so exit
 	elif(line.startswith('ERROR')):
 		exit(1)
@@ -204,11 +230,13 @@ def handle_server_line(sock,line,state_change,state_file):
 		py3sendln(sock,'NICK :'+bot_nick)
 	#got a PM, so reply
 	elif(server_cmd=='PRIVMSG'):
-		handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file)
+		lines_since_write,lines_since_sort_chk=handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	#got an invite, so join
 	elif(server_cmd=='INVITE'):
 		succcesss,name,channel=get_token(line,' :')
 		py3sendln(sock,'JOIN :'+channel)
+	
+	return (lines_since_write,lines_since_sort_chk)
 	
 
 def main(state_file='state_file.txt'):
@@ -227,7 +255,11 @@ def main(state_file='state_file.txt'):
 	
 	
 	py3sendln(sock,'NICK :'+bot_nick)
-	py3sendln(sock,'USER 1 2 3 4')
+	py3sendln(sock,'USER '+bot_nick+' 2 3 4')
+	
+	#initialize counters for events that only happen every n lines
+	lines_since_write=100
+	lines_since_sort_chk=100
 	
 	#carry from multi-line reads
 	carry=''
@@ -244,7 +276,7 @@ def main(state_file='state_file.txt'):
 		line=''
 		for i in range(0,len(data)):
 			if(data[i]=="\r" or data[i]=="\n"):
-				handle_server_line(sock,line,state_change,state_file)
+				lines_since_write,lines_since_sort_chk=handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 				line=''
 			else:
 				line+=data[i]
@@ -255,4 +287,5 @@ def main(state_file='state_file.txt'):
 #runtime
 if(__name__=='__main__'):
 	main()
+#	main('full_state_file.txt') #this file is massive on my machine, it's built from like 800,000 lines of IRC logs, and it takes a ton of RAM
 
