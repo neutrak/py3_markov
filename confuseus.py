@@ -187,7 +187,10 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			check_sorted=True
 			lines_since_sort_chk=0
 		
-		state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=check_sorted)
+		if(line.find('http://')<0):
+			state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=check_sorted)
+		else:
+			print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
 		
 		if(lines_since_write>=60):
 			markov.save_state_change_to_file(state_change,state_file)
