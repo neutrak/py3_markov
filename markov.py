@@ -179,7 +179,7 @@ def is_state_sorted(state_change):
 #if so, then add a null suffix
 #this serves to help avoid rambling by stopping at roughly correct spots
 #( or horribly incorrect spots :P )
-def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=True,check_sorted=False,chain_ended=False):
+def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorted=False,chain_ended=False):
 	token,text=next_token(text)
 	
 	if(verbose_dbg):
