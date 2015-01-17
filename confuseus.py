@@ -3,6 +3,7 @@
 from socket import *
 import markov
 import random
+import sys
 
 bot_nick='confuseus'
 autojoin_channels=['#imgurians','#imgurians-tech']
@@ -187,8 +188,8 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			check_sorted=True
 			lines_since_sort_chk=0
 		
-		if(line.find('http://')<0):
-			state_change=markov.chain_from(line,state_change,prefix=['',''],check_sorted=check_sorted)
+		if((line.find('http://')<0) and (line.find('https://')<0)):
+			state_change=markov.chain_from(line+"\n",state_change,prefix=['',''],check_sorted=check_sorted)
 		else:
 			print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
 		
@@ -200,6 +201,8 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
+	global bot_nick
+	
 #	print('handle_server_line debug 0, got line '+line+', len(state_change)='+str(len(state_change))+', state_file='+state_file+', lines_since_write='+str(lines_since_write)+', lines_since_sort_chk='+str(lines_since_sort_chk))
 	
 	#ignore blank lines
@@ -243,8 +246,15 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	
 
 def main(state_file='state_file.txt'):
+	global bot_nick
+	
 	print('Reading in state file...')
 	state_change=markov.read_state_change_from_file(state_file)
+	
+	#if given an argument, it's the name to use
+	if(len(sys.argv)>1):
+		bot_nick=sys.argv[1]
+	print('Bot Nick is '+bot_nick)
 	
 	print('Creating connection to '+host+' on port '+str(port)+'...')
 	

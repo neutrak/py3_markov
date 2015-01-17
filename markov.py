@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import random
+import sys
 
 #this is just a data structure to store state transition information
 #python has no notion of a "struct" so this is as close as we can get
@@ -173,15 +174,21 @@ def is_state_sorted(state_change):
 #the text follows from the given prefix
 #the initial prefix consists of null strings
 #the length of the prefix array is used throughout the chain
-def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorted=False):
+#
+#the chain_ended parameter is for if the token delimiter was a newline,
+#if so, then add a null suffix
+#this serves to help avoid rambling by stopping at roughly correct spots
+#( or horribly incorrect spots :P )
+def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=True,check_sorted=False,chain_ended=False):
 	token,text=next_token(text)
 	
 	if(verbose_dbg):
 		print('chain_from debug 0, prefix='+str(prefix)+', token='+token)
 	
-	#if the token was empty, then we hit the end of the text
+	
+	#if the chain has ended, then we hit the end of the text (or end of line)
 	#this is the base case to end recursion
-	if(token==''):
+	if(chain_ended):
 		return state_change
 	
 	transition_found=False
@@ -199,7 +206,7 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 		state_change.insert(ins_idx,new_state)
 	
 	if(verbose_dbg):
-		print('chain_from debug 1, curren state_change array is: ')
+		print('chain_from debug 1, current state_change array is: ')
 		output_states(state_change)
 		
 	#this check is super expensive so it's only done when asked
@@ -209,11 +216,6 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 	#so I'm like 95% confident in its ability
 	if(check_sorted):
 		if(not is_state_sorted(state_change)):
-#			print('Err: states are NOT properly sorted, this program will FAIL!!!!')
-#			print('state change array is: ')
-#			output_states(state_change)
-#			exit(1)
-			
 			print('Warn: states are NOT properly sorted; sorting manually to correct the problem...')
 			print('Warn (continued): If the data has been this way for a while it may now be invalid and have duplicates etc.')
 			print('state change array (pre-sort) was: ')
@@ -227,8 +229,12 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 	#update the prefix for the next token
 	prefix=[prefix[1],token]
 	
+	chain_ended=False
+	if(token==''):
+		chain_ended=True
+	
 	#there may be tokens still left, so try on those
-	return chain_from(text,state_change,prefix)
+	return chain_from(text,state_change,prefix,chain_ended=chain_ended)
 
 #generate text based on the given state change array
 #default prefix of ['',''] generates from starting states
@@ -328,6 +334,9 @@ def read_state_change_from_file(filename):
 	except IOError:
 		print('Err: could not read from state_change file')
 		return state_change
+	except UnicodeDecodeError:
+		print('Err: could not decode fomr state_change file!!!!!; this is BAD')
+		return state_change
 	
 	#each line in this file corresponds to a state,
 	#except for those starting with #, which are comments
@@ -366,7 +375,6 @@ if(__name__=='__main__'):
 	
 	state_file=None
 	
-	import sys
 	if(len(sys.argv)>1):
 		state_file=sys.argv[1]
 		print('using file '+state_file+' for input and output of state_change')
