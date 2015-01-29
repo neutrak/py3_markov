@@ -70,6 +70,29 @@ def ft_to_m(ft):
 def m_to_ft(m):
 	return m*3.281
 
+def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk):
+	#writing back to the state file and checking the sorting are expensive operations
+	#as such, they're not done every line, but only every n lines, as specified here
+	
+	lines_since_write+=1
+	lines_since_sort_chk+=1
+	
+	check_sorted=False
+	if(lines_since_sort_chk>=20):
+		check_sorted=True
+		lines_since_sort_chk=0
+	
+	if((line.find('http://')<0) and (line.find('https://')<0)):
+		state_change=markov.chain_from(line+"\n",state_change,prefix=['',''],check_sorted=check_sorted)
+	else:
+		print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
+	
+	if(lines_since_write>=60):
+		markov.save_state_change_to_file(state_change,state_file)
+		lines_since_write=0
+	
+	return (lines_since_write,lines_since_sort_chk)
+
 def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	#get some information (user, nick, host, etc.)
 	success,info,line=get_token(line,' ')
@@ -116,6 +139,11 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			output=markov.generate(state_change)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		
+		#because people often talk to the bot in complete phrases,
+		#go ahead and include these lines in the learning set
+		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
+		
 		return (lines_since_write,lines_since_sort_chk)
 		
 	
@@ -177,25 +205,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		if(is_pm):
 			py3sendln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)')
 		
-		#writing back to the state file and checking the sorting are expensive operations
-		#as such, they're not done every line, but only every n lines, as specified here
-		
-		lines_since_write+=1
-		lines_since_sort_chk+=1
-		
-		check_sorted=False
-		if(lines_since_sort_chk>=20):
-			check_sorted=True
-			lines_since_sort_chk=0
-		
-		if((line.find('http://')<0) and (line.find('https://')<0)):
-			state_change=markov.chain_from(line+"\n",state_change,prefix=['',''],check_sorted=check_sorted)
-		else:
-			print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
-		
-		if(lines_since_write>=60):
-			markov.save_state_change_to_file(state_change,state_file)
-			lines_since_write=0
+		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	
