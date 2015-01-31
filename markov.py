@@ -180,23 +180,16 @@ def pg_search(db_handle,db_login,prefix,suffix=None):
 	
 	pg_query=''
 	if(suffix!=None):
-#		pg_query='SELECT * FROM states WHERE prefix=\''+(' '.join(prefix))+'\' AND suffix=\''+suffix+'\''
 		pg_query='SELECT * FROM states WHERE prefix=$1 AND suffix=$2'
-#		pg_params=[' '.join(prefix),suffix]
 	else:
-#		pg_query='SELECT * FROM states WHERE prefix=\''+(' '.join(prefix))+'\''
 		pg_query='SELECT * FROM states WHERE prefix=$1'
-#		pg_params=[' '.join(prefix)]
 	
-#	results=pg_run_query(db_login,pg_query,pg_params)
 	postgre_ret=db_handle.prepare(pg_query)
 	results=[]
 	if(suffix!=None):
 		results=postgre_ret(' '.join(prefix),suffix)
 	else:
 		results=postgre_ret(' '.join(prefix))
-	
-#	print('pg_search debug -1, pg_query=\"'+pg_query+'\", results='+str(results))
 	
 	#python's ternary operator can go fuck itself
 	success=(True if len(results)>0 else False)
@@ -207,29 +200,20 @@ def pg_search(db_handle,db_login,prefix,suffix=None):
 			new_state=state_transition(row['prefix'].split(' '),row['suffix'])
 			new_state.count=int(row['count'])
 			states.append(new_state)
-#			print('pg_search debug 0, new_state has prefix='+str(new_state.prefix)+
-#				', suffix=\''+str(new_state.suffix)+
-#				'\', count='+str(new_state.count))
 	
 	return (success,states)
 
 def pg_insert(db_handle,db_login,prefix,suffix,count):
-#	pg_query='INSERT INTO states (prefix,suffix,count) VALUES (\''+(' '.join(prefix))+'\',\''+suffix+'\','+str(count)+')'
 	pg_query='INSERT INTO states (prefix,suffix,count) VALUES ($1,$2,$3)'
-#	pg_params=[' '.join(prefix),suffix,count]
 	
-#	results=pg_run_query(db_login,pg_query,pg_params)
 	postgre_ret=db_handle.prepare(pg_query)
 	results=postgre_ret(' '.join(prefix),suffix,count)
 	
 	return None
 
 def pg_update(db_handle,db_login,prefix,suffix,count):
-#	pg_query='UPDATE states SET count='+str(count)+' WHERE prefix=\''+(' '.join(prefix))+'\' AND suffix=\''+suffix+'\''
 	pg_query='UPDATE states SET count=$1 WHERE prefix=$2 AND suffix=$3'
-#	pg_params=[count,' '.join(prefix),suffix]
 	
-#	results=pg_run_query(db_login,pg_query)
 	postgre_ret=db_handle.prepare(pg_query)
 	results=postgre_ret(count,' '.join(prefix),suffix)
 	
