@@ -3,6 +3,12 @@
 import random
 import sys
 
+try:
+	import postgresql
+except ImportError:
+	use_pg=False
+	db_login=None
+
 #this is just a data structure to store state transition information
 #python has no notion of a "struct" so this is as close as we can get
 class state_transition:
@@ -10,6 +16,12 @@ class state_transition:
 		self.prefix=prefix
 		self.suffix=suffix
 		self.count=1
+
+class db_info:
+	def __init__(self,user,passwd,db_name):
+		self.user=user
+		self.passwd=passwd
+		self.db_name=db_name
 
 VERSION='0.1.0'
 
@@ -151,6 +163,77 @@ def binsearch_states(state_change,min_idx,max_idx,prefix,suffix=None):
 	#because we already have a nice base return case if min_idx==max_idx, we'll use that
 	return binsearch_states(state_change,guess_idx,guess_idx,prefix,suffix)
 	
+def pg_connect(db_login):
+	db_handle=postgresql.open('pq://'+db_login.user+':'+db_login.passwd+'@localhost/'+db_login.db_name)
+	return db_handle
+
+def pg_run_query(db_login,pg_query,pg_params):
+	db_handle=pg_connect(db_login)
+	postgre_ret=db_handle.prepare(pg_query)
+	results=postgre_ret(pg_params)
+	db_handle.close()
+	
+	return results
+
+def pg_search(db_handle,db_login,prefix,suffix=None):
+	pg_params=[]
+	
+	pg_query=''
+	if(suffix!=None):
+#		pg_query='SELECT * FROM states WHERE prefix=\''+(' '.join(prefix))+'\' AND suffix=\''+suffix+'\''
+		pg_query='SELECT * FROM states WHERE prefix=$1 AND suffix=$2'
+#		pg_params=[' '.join(prefix),suffix]
+	else:
+#		pg_query='SELECT * FROM states WHERE prefix=\''+(' '.join(prefix))+'\''
+		pg_query='SELECT * FROM states WHERE prefix=$1'
+#		pg_params=[' '.join(prefix)]
+	
+#	results=pg_run_query(db_login,pg_query,pg_params)
+	postgre_ret=db_handle.prepare(pg_query)
+	results=[]
+	if(suffix!=None):
+		results=postgre_ret(' '.join(prefix),suffix)
+	else:
+		results=postgre_ret(' '.join(prefix))
+	
+#	print('pg_search debug -1, pg_query=\"'+pg_query+'\", results='+str(results))
+	
+	#python's ternary operator can go fuck itself
+	success=(True if len(results)>0 else False)
+	
+	states=[]
+	if(success):
+		for row in results:
+			new_state=state_transition(row['prefix'].split(' '),row['suffix'])
+			new_state.count=int(row['count'])
+			states.append(new_state)
+#			print('pg_search debug 0, new_state has prefix='+str(new_state.prefix)+
+#				', suffix=\''+str(new_state.suffix)+
+#				'\', count='+str(new_state.count))
+	
+	return (success,states)
+
+def pg_insert(db_handle,db_login,prefix,suffix,count):
+#	pg_query='INSERT INTO states (prefix,suffix,count) VALUES (\''+(' '.join(prefix))+'\',\''+suffix+'\','+str(count)+')'
+	pg_query='INSERT INTO states (prefix,suffix,count) VALUES ($1,$2,$3)'
+#	pg_params=[' '.join(prefix),suffix,count]
+	
+#	results=pg_run_query(db_login,pg_query,pg_params)
+	postgre_ret=db_handle.prepare(pg_query)
+	results=postgre_ret(' '.join(prefix),suffix,count)
+	
+	return None
+
+def pg_update(db_handle,db_login,prefix,suffix,count):
+#	pg_query='UPDATE states SET count='+str(count)+' WHERE prefix=\''+(' '.join(prefix))+'\' AND suffix=\''+suffix+'\''
+	pg_query='UPDATE states SET count=$1 WHERE prefix=$2 AND suffix=$3'
+#	pg_params=[count,' '.join(prefix),suffix]
+	
+#	results=pg_run_query(db_login,pg_query)
+	postgre_ret=db_handle.prepare(pg_query)
+	results=postgre_ret(count,' '.join(prefix),suffix)
+	
+	return None
 
 def output_states(state_change):
 	print('[')
@@ -179,42 +262,59 @@ def is_state_sorted(state_change):
 #if so, then add a null suffix
 #this serves to help avoid rambling by stopping at roughly correct spots
 #( or horribly incorrect spots :P )
-def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorted=False,chain_ended=False):
+def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorted=False,chain_ended=False,use_pg=False,db_login=None):
 	token,text=next_token(text)
 	
 	if(verbose_dbg):
 		print('chain_from debug 0, prefix='+str(prefix)+', token='+token)
 	
-	
 	#if the chain has ended, then we hit the end of the text (or end of line)
 	#this is the base case to end recursion
 	if(chain_ended):
-		return state_change
+		if(use_pg):
+			return None
+		else:
+			return state_change
 	
 	transition_found=False
 	
-	#do a binary search to find this state
-	#(or, if not found, to find where it should go)
-	success,ins_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,token)
-	if(success):
-		#found state, just update the count
-		state_change[ins_idx].count+=1
+	if(use_pg):
+		if(verbose_dbg):
+			print('chain_from debug 0.5, inserting or updating (prefix,suffix,count) ('+str(prefix)+',\''+token+'\','+str(1)+')')
+		
+		db_handle=pg_connect(db_login)
+		
+		success,results=pg_search(db_handle,db_login,prefix,token)
+		if(success):
+			results[0].count+=1
+			pg_update(db_handle,db_login,prefix,token,int(results[0].count))
+		else:
+			pg_insert(db_handle,db_login,prefix,token,1)
+		
+		db_handle.close()
 	else:
-		#didn't find state, inserting at index ins_idx
-		new_state=state_transition(prefix,token)
-#		state_change=state_change[0:ins_idx]+[new_state]+state_change[ins_idx:]
-		state_change.insert(ins_idx,new_state)
-	
-	if(verbose_dbg):
-		print('chain_from debug 1, current state_change array is: ')
-		output_states(state_change)
+		#do a binary search to find this state
+		#(or, if not found, to find where it should go)
+		success,ins_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,token)
+		if(success):
+			#found state, just update the count
+			state_change[ins_idx].count+=1
+		else:
+			#didn't find state, inserting at index ins_idx
+			new_state=state_transition(prefix,token)
+#			state_change=state_change[0:ins_idx]+[new_state]+state_change[ins_idx:]
+			state_change.insert(ins_idx,new_state)
+		
+		if(verbose_dbg):
+			print('chain_from debug 1, current state_change array is: ')
+			output_states(state_change)
 		
 	#this check is super expensive so it's only done when asked
 	#I verified on 5000 lines test data that it works, but there might be some weird case I missed
 	#I also fed in 50000 lines without checking sorting,
 	#then checked sorting on the resulting state file and it was right,
 	#so I'm like 95% confident in its ability
-	if(check_sorted):
+	if((not use_pg) and (check_sorted)):
 		if(not is_state_sorted(state_change)):
 			print('Warn: states are NOT properly sorted; sorting manually to correct the problem...')
 			print('Warn (continued): If the data has been this way for a while it may now be invalid and have duplicates etc.')
@@ -234,13 +334,13 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 		chain_ended=True
 	
 	#there may be tokens still left, so try on those
-	return chain_from(text,state_change,prefix,chain_ended=chain_ended)
+	return chain_from(text,state_change,prefix,chain_ended=chain_ended,use_pg=use_pg,db_login=db_login)
 
 #generate text based on the given state change array
 #default prefix of ['',''] generates from starting states
 #note that because this is recursive and python doesn't TCO,
 #word_limit must be less than max recursion depth
-def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True):
+def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True,use_pg=False,db_login=None):
 	#trim leading whitespace just to be pretty
 	acc=acc.lstrip(' ')
 	
@@ -252,24 +352,41 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#this is used so we can calculate probabilities based on state counts
 	prefix_count=0
 	
-	#binary search for this prefix, so we get all the valid transitions quickly
-	success,start_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,suffix=None)
-	
-	#if the prefix wasn't found, then there are no transitions left
-	if(not success):
-		start_idx=len(state_change)
-	
+	#the states which indicate transitions starting with the given prefix
 	transition_states=[]
-	for state_idx in range(start_idx,len(state_change)):
-		state=state_change[state_idx]
-		if(state.prefix==prefix):
-			transition_states.append(state)
-			prefix_count+=(state.count)
-		#because state_change is sorted by prefix,
-		#as soon as we find an entry with a larger prefix,
-		#we can stop looking
-		elif(state.prefix>prefix):
-			break
+	
+	if(use_pg):
+		db_handle=pg_connect(db_login)
+		
+		success,results=pg_search(db_handle,db_login,prefix,suffix=None)
+		if(success):
+			transition_states=results
+			
+			prefix_count=len(transition_states)
+		else:
+			#since prefix_count is already 0, nothing needs to be done here
+			#acc will be returned shortly
+			pass
+		
+		db_handle.close()
+	else:
+		#binary search for this prefix, so we get all the valid transitions quickly
+		success,start_idx=binsearch_states(state_change,0,len(state_change)-1,prefix,suffix=None)
+		
+		#if the prefix wasn't found, then there are no transitions left
+		if(not success):
+			start_idx=len(state_change)
+		
+		for state_idx in range(start_idx,len(state_change)):
+			state=state_change[state_idx]
+			if(state.prefix==prefix):
+				transition_states.append(state)
+				prefix_count+=(state.count)
+			#because state_change is sorted by prefix,
+			#as soon as we find an entry with a larger prefix,
+			#we can stop looking
+			elif(state.prefix>prefix):
+				break
 	
 	if(verbose_dbg):
 		print('markov.generate debug 0, got '+str(len(transition_states))+' transition states for prefix '+str(prefix))
@@ -286,7 +403,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	for state in transition_states:
 		#we found our next state, so go to it (recursively)
 		if(next_state_idx<state.count):
-			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix)
+			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix,use_pg=use_pg,db_login=db_login)
 		
 		#we didn't find the state yet,
 		#but there was some probability that it was this state
@@ -373,14 +490,25 @@ if(__name__=='__main__'):
 	for i in range(0,prefix_len):
 		prefix.append('')
 	
+	use_pg=False
+	for i in range(1,len(sys.argv)):
+		if(sys.argv[i]=='--postgresql'):
+			use_pg=True
+	
 	state_file=None
-	
-	if(len(sys.argv)>1):
-		state_file=sys.argv[1]
-		print('using file '+state_file+' for input and output of state_change')
-	
-	if(state_file!=None):
-		state_change=read_state_change_from_file(state_file)
+	db_login=None
+	if(not use_pg):
+		if(len(sys.argv)>1):
+			state_file=sys.argv[1]
+			print('using file '+state_file+' for input and output of state_change')
+		
+		if(state_file!=None):
+			state_change=read_state_change_from_file(state_file)
+	else:
+		#this is for the optional postgres backend
+		db_login=db_info('sql','sql','markovdb')
+		
+		print('using postgres database '+db_login.db_name+' for input and output of state changes')
 	
 	print('reading from stdin...')
 	
@@ -403,7 +531,7 @@ if(__name__=='__main__'):
 	for line in learning_string_lines:
 		if(i%10==0):
 			print('learning from line index '+str(i)+'...')
-		state_change=chain_from(line,state_change,prefix=prefix)
+		state_change=chain_from(line,state_change,prefix=prefix,use_pg=use_pg,db_login=db_login)
 		i+=1
 	
 	
@@ -413,7 +541,7 @@ if(__name__=='__main__'):
 	
 	print('generating...')
 	
-	output=generate(state_change,prefix=prefix)
+	output=generate(state_change,prefix=prefix,use_pg=use_pg,db_login=db_login)
 	
 	print('generated output: ')
 	

@@ -5,6 +5,15 @@ import markov
 import random
 import sys
 
+#for the database backend which significantly reduces RAM use
+use_pg=True
+db_login=markov.db_info('sql','sql','markovdb')
+try:
+	import postgresql
+except ImportError:
+	use_pg=False
+	db_login=None
+
 bot_nick='confuseus'
 autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
@@ -83,11 +92,13 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 		lines_since_sort_chk=0
 	
 	if((line.find('http://')<0) and (line.find('https://')<0)):
-		state_change=markov.chain_from(line+"\n",state_change,prefix=['',''],check_sorted=check_sorted)
+		state_change=markov.chain_from(line+"\n",state_change,prefix=['',''],check_sorted=check_sorted,use_pg=use_pg,db_login=db_login)
 	else:
 		print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
 	
-	if(lines_since_write>=60):
+	if(use_pg):
+		lines_since_write=0
+	elif(lines_since_write>=60):
 		markov.save_state_change_to_file(state_change,state_file)
 		lines_since_write=0
 	
@@ -131,12 +142,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			print('Chose a random word to start from ('+words[rand_word_idx]+')')
 			
 			#try to use a word from the user
-			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx])
+			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login)
 			
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
 		if(output=='' or output==words[rand_word_idx]):
-			output=markov.generate(state_change)
+			output=markov.generate(state_change,use_pg=use_pg,db_login=db_login)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		
@@ -149,7 +160,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#check if this was a bot command
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
-		output=markov.generate(state_change)
+		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
@@ -259,7 +270,9 @@ def main(state_file='state_file.txt'):
 	global bot_nick
 	
 	print('Reading in state file...')
-	state_change=markov.read_state_change_from_file(state_file)
+	state_change=None
+	if(not use_pg):
+		state_change=markov.read_state_change_from_file(state_file)
 	
 	#if given an argument, it's the name to use
 	if(len(sys.argv)>1):
@@ -310,5 +323,4 @@ def main(state_file='state_file.txt'):
 #runtime
 if(__name__=='__main__'):
 	main()
-#	main('full_state_file.txt') #this file is massive on my machine, it's built from like 800,000 lines of IRC logs, and it takes a ton of RAM
 
