@@ -1,0 +1,12 @@
+{
+	"prefix_len":2,
+	
+	"use_pg":true,
+	"pg_user":"sql",
+	"pg_passwd":"sql",
+	"pg_dbname":"markovdb",
+	
+	"state_file":"state_file.txt"
+	
+}
+

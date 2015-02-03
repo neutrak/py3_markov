@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import config
 import random
 import sys
 
@@ -465,34 +466,52 @@ def read_state_change_from_file(filename):
 if(__name__=='__main__'):
 	print('py3_markov version '+VERSION)
 	
+	config_file=config.dflt_cfg
+	if(len(sys.argv)>1):
+		config_file=sys.argv[1]
+	print('using JSON config file '+config_file)
+	
 	#the state transition array structure,
 	#which contains prefixes, suffixes, and probabilities associated with each suffix
 	state_change=[]
 	
-	prefix_len=2
+	prefix_len=None
+	try:
+		prefix_len=int(config.get_json_param(config.read_json_file(config_file),'prefix_len'))
+	except ValueError:
+		prefix_len=None
+	
+	if(prefix_len==None):
+		prefix_len=2
 	prefix=[]
 	for i in range(0,prefix_len):
 		prefix.append('')
 	
-	use_pg=False
-	for i in range(1,len(sys.argv)):
-		if(sys.argv[i]=='--postgresql'):
-			use_pg=True
+	use_pg=config.get_json_param(config.read_json_file(config_file),'use_pg')
+	if(use_pg==None):
+		use_pg=False
 	
 	state_file=None
 	db_login=None
 	if(not use_pg):
-		if(len(sys.argv)>1):
-			state_file=sys.argv[1]
-			print('using file '+state_file+' for input and output of state_change')
-		
+		state_file=config.get_json_param(config.read_json_file(config_file),'state_file')
 		if(state_file!=None):
+			print('using file '+state_file+' for input and output of state_change')
 			state_change=read_state_change_from_file(state_file)
+		else:
+			print('Warn: Not using a state_change file or database backend; memory will not be saved!')
 	else:
 		#this is for the optional postgres backend
-		db_login=db_info('sql','sql','markovdb')
-		
-		print('using postgres database '+db_login.db_name+' for input and output of state changes')
+		config_tree=config.read_json_file(config_file)
+		pg_user=config.get_json_param(config_tree,'pg_user')
+		pg_passwd=config.get_json_param(config_tree,'pg_passwd')
+		pg_dbname=config.get_json_param(config_tree,'pg_dbname')
+		if(pg_user==None or pg_passwd==None or pg_dbname==None):
+			print('Err: Need username, password, and db settings to use postgresql backend')
+			use_pg=False
+		else:
+			db_login=db_info(pg_user,pg_passwd,pg_dbname)
+			print('using postgres database '+db_login.db_name+' for input and output of state changes')
 	
 	print('reading from stdin...')
 	

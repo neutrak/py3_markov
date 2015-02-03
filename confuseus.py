@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 from socket import *
+import config
 import markov
 import random
 import sys
 
 #for the database backend which significantly reduces RAM use
-use_pg=True
-db_login=markov.db_info('sql','sql','markovdb')
+use_pg=False
+db_login=False
 try:
 	import postgresql
 except ImportError:
@@ -266,7 +267,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	return (lines_since_write,lines_since_sort_chk)
 	
 
-def main(state_file='state_file.txt'):
+def main(state_file):
 	global bot_nick
 	
 	print('Reading in state file...')
@@ -322,5 +323,27 @@ def main(state_file='state_file.txt'):
 
 #runtime
 if(__name__=='__main__'):
-	main()
+	config_file=config.dflt_cfg
+	if(len(sys.argv)>1):
+		config_file=sys.argv[1]
+	print('using JSON config file '+config_file)
+	
+	use_pg=config.get_json_param(config.read_json_file(config_file),'use_pg')
+	if(use_pg==None):
+		use_pg=False
+	
+	if(use_pg):
+		#this is for the optional postgres backend
+		config_tree=config.read_json_file(config_file)
+		pg_user=config.get_json_param(config_tree,'pg_user')
+		pg_passwd=config.get_json_param(config_tree,'pg_passwd')
+		pg_dbname=config.get_json_param(config_tree,'pg_dbname')
+		if(pg_user==None or pg_passwd==None or pg_dbname==None):
+			print('Err: Need username, password, and db settings to use postgresql backend')
+			use_pg=False
+		else:
+			db_login=db_info(pg_user,pg_passwd,pg_dbname)
+			print('using postgres database '+db_login.db_name+' for input and output of state changes')
+	
+	main(config.get_json_param(config.read_json_file(config_file),'state_file'))
 
