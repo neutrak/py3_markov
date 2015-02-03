@@ -342,7 +342,7 @@ if(__name__=='__main__'):
 			print('Err: Need username, password, and db settings to use postgresql backend')
 			use_pg=False
 		else:
-			db_login=db_info(pg_user,pg_passwd,pg_dbname)
+			db_login=markov.db_info(pg_user,pg_passwd,pg_dbname)
 			print('using postgres database '+db_login.db_name+' for input and output of state changes')
 	
 	main(config.get_json_param(config.read_json_file(config_file),'state_file'))
