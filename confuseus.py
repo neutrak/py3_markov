@@ -5,6 +5,7 @@ import config
 import markov
 import random
 import sys
+import time
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -25,6 +26,9 @@ buffer_size=1024
 
 #log a line to a file, and also output it for debugging
 def log_line(line,log_file='log.txt'):
+	#timestamp the line
+	line=str(int(time.time()))+' '+line
+	
 	#debug
 	print(line)
 	
