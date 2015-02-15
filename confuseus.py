@@ -23,6 +23,15 @@ port=6667
 
 buffer_size=1024
 
+#log a line to a file, and also output it for debugging
+def log_line(line,log_file='log.txt'):
+	#debug
+	print(line)
+	
+	fp=open(log_file,'a')
+	fp.write(line+"\n")
+	fp.close()
+
 #send a string to a socket in python3
 #s is the socket
 def py3send(s,message):
@@ -32,8 +41,7 @@ def py3send(s,message):
 		print('Err: Unicode to latin-1 conversion error, ignoring message '+str(message))
 
 def py3sendln(s,message):
-	#debug
-	print('>> '+message)
+	log_line('>> '+message)
 	
 	py3send(s,message+"\n")
 
@@ -119,7 +127,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		line=line[1:]
 	
 	#debug
-	print('['+channel+'] <'+nick+'> '+line)
+	log_line('['+channel+'] <'+nick+'> '+line)
 	
 	#if they PM'd us, then PM 'em right back
 	#that'll show 'em
@@ -225,8 +233,6 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
 	
-#	print('handle_server_line debug 0, got line '+line+', len(state_change)='+str(len(state_change))+', state_file='+state_file+', lines_since_write='+str(lines_since_write)+', lines_since_sort_chk='+str(lines_since_sort_chk))
-	
 	#ignore blank lines
 	if(line==''):
 		return (lines_since_write,lines_since_sort_chk)
@@ -246,7 +252,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	
 	#verbose debug
 	if(server_cmd!='PRIVMSG'):
-		print(server_name+' '+server_cmd+' '+line)
+		log_line(server_name+' '+server_cmd+' '+line)
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
@@ -270,9 +276,9 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 def main(state_file):
 	global bot_nick
 	
-	print('Reading in state file...')
 	state_change=None
 	if(not use_pg):
+		print('Reading in state file...')
 		state_change=markov.read_state_change_from_file(state_file)
 	
 	#if given an argument, it's the name to use
