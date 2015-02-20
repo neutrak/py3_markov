@@ -163,6 +163,15 @@ def binsearch_states(state_change,min_idx,max_idx,prefix,suffix=None):
 	
 	#because we already have a nice base return case if min_idx==max_idx, we'll use that
 	return binsearch_states(state_change,guess_idx,guess_idx,prefix,suffix)
+
+#search states for a suffix
+#this is O(n) because the state_change array is sorted by prefix
+def suffix_get_states(state_change,suffix):
+	acc=[]
+	for state in state_change:
+		if(state.suffix==suffix):
+			acc.append(state)
+	return acc
 	
 def pg_connect(db_login):
 	db_handle=postgresql.open('pq://'+db_login.user+':'+db_login.passwd+'@localhost/'+db_login.db_name)
@@ -191,6 +200,26 @@ def pg_search(db_handle,db_login,prefix,suffix=None):
 		results=postgre_ret(' '.join(prefix),suffix)
 	else:
 		results=postgre_ret(' '.join(prefix))
+	
+	#python's ternary operator can go fuck itself
+	success=(True if len(results)>0 else False)
+	
+	states=[]
+	if(success):
+		for row in results:
+			new_state=state_transition(row['prefix'].split(' '),row['suffix'])
+			new_state.count=int(row['count'])
+			states.append(new_state)
+	
+	return (success,states)
+
+def pg_search_suffix(db_handle,db_login,suffix):
+	pg_params=[]
+	
+	pg_query='SELECT * FROM states WHERE suffix=$1'
+	
+	postgre_ret=db_handle.prepare(pg_query)
+	results=postgre_ret(suffix)
 	
 	#python's ternary operator can go fuck itself
 	success=(True if len(results)>0 else False)
@@ -325,7 +354,7 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 #default prefix of ['',''] generates from starting states
 #note that because this is recursive and python doesn't TCO,
 #word_limit must be less than max recursion depth
-def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True,use_pg=False,db_login=None):
+def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True,use_pg=False,db_login=None,back_gen=False):
 	#trim leading whitespace just to be pretty
 	acc=acc.lstrip(' ')
 	
@@ -376,6 +405,40 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	if(verbose_dbg):
 		print('markov.generate debug 0, got '+str(len(transition_states))+' transition states for prefix '+str(prefix))
 	
+	#the states which indicate transitions starting from the given suffix
+	#(1st word of accumulator)
+	back_suffix=acc.split(' ')[0]
+	back_transition_states=[]
+	
+	if(back_suffix==''):
+		back_gen=False
+	
+	#handle transitions going backwards
+	if(back_gen):
+		if(use_pg):
+			db_handle=pg_connect(db_login)
+			
+			success,back_transition_states=pg_search_suffix(db_handle,db_login,back_suffix)
+			if(success):
+				back_transition_states_states=results
+			
+			db_handle.close()
+		else:
+			back_transition_states=suffix_get_states(state_change,back_suffix)
+	
+	if(verbose_dbg and back_gen):
+		print('markov.generate debug 1, got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix))
+	
+	if(back_gen and (len(back_transition_states)>0)):
+		back_state_idx=random.randint(0,len(back_transition_states)-1)
+		for state in back_transition_states:
+			if(back_state_idx<state.count):
+				if(state.prefix[-1]==''):
+					back_gen=False
+				else:
+					acc=state.prefix[-1]+' '+acc
+			back_state_idx-=state.count
+	
 	#no transition state was found (nothing with that prefix),
 	#return accumulator now
 	if(prefix_count==0):
@@ -388,7 +451,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	for state in transition_states:
 		#we found our next state, so go to it (recursively)
 		if(next_state_idx<state.count):
-			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix,use_pg=use_pg,db_login=db_login)
+			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix,use_pg=use_pg,db_login=db_login,back_gen=back_gen)
 		
 		#we didn't find the state yet,
 		#but there was some probability that it was this state
@@ -544,7 +607,7 @@ if(__name__=='__main__'):
 	
 	print('generating...')
 	
-	output=generate(state_change,prefix=prefix,use_pg=use_pg,db_login=db_login)
+	output=generate(state_change,prefix=prefix,use_pg=use_pg,db_login=db_login,back_gen=True)
 	
 	print('generated output: ')
 	
