@@ -437,6 +437,10 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 					back_gen=False
 				else:
 					acc=state.prefix[-1]+' '+acc
+					#remember this counts as a word
+					word_limit-=1
+				#stop once one word is prepended
+				break
 			back_state_idx-=state.count
 	
 	#no transition state was found (nothing with that prefix),
