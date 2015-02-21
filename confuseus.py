@@ -160,7 +160,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
 		if(output=='' or output==words[rand_word_idx]):
-			output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=True)
+			output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		
@@ -173,7 +173,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#check if this was a bot command
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
-		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=True)
+		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
