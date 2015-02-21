@@ -222,7 +222,8 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		except ValueError:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
 	elif(cmd.startswith(cmd_esc)):
-		py3sendln(sock,'PRIVMSG '+channel+' :yeah um, \"'+cmd+'\" isn\'t a command dude, chill out; try '+cmd_esc+'help if you need help')
+#		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
+		pass
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
 		#if this was a pm then let the user know how to get help if they want it
