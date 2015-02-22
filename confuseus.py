@@ -154,8 +154,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			rand_word_idx=random.randint(0,len(words)-1)
 			print('Chose a random word to start from ('+words[rand_word_idx]+')')
 			
+			#sometimes back-generate and sometimes don't
+			#just to mess with people :)
+			back_gen=bool(random.getrandbits(1))
+			
 			#try to use a word from the user
-			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=True)
+			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=back_gen)
 			
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
