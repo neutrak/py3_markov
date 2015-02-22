@@ -152,11 +152,17 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		words=line_post_cmd.split(' ')
 		if(len(words)>0):
 			rand_word_idx=random.randint(0,len(words)-1)
-			print('Chose a random word to start from ('+words[rand_word_idx]+')')
 			
 			#sometimes back-generate and sometimes don't
 			#just to mess with people :)
-			back_gen=bool(random.getrandbits(1))
+#			back_gen=bool(random.getrandbits(1))
+			
+			#back_gen broke cases where the user
+			#intended confuseus to start from a given word
+			#so it's disabled
+			back_gen=False
+			
+			print('Chose a random word to start from ('+words[rand_word_idx]+'), back_gen is '+str(back_gen))
 			
 			#try to use a word from the user
 			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=back_gen)
