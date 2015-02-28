@@ -61,7 +61,7 @@ def get_page(url,port=80):
 	http_rqst=''
 	http_rqst+='GET '+path+' HTTP/1.0'+"\n"
 	http_rqst+='Host:'+domain+"\n"
-	http_rqst+='User-Agent:confuseus'+"\n"
+	http_rqst+='User-Agent:confuseus (an irc bot, like internet explorer)'+"\n"
 	http_rqst+="\n"
 	
 	print(http_rqst)
