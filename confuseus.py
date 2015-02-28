@@ -82,7 +82,7 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 	
 	return (lines_since_write,lines_since_sort_chk)
 
-def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,state_change,use_pg,db_login):
+def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
 	handled=False
 	
 	#check if this was a bot command
@@ -247,7 +247,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		return (lines_since_write,lines_since_sort_chk)
 		
 	#if this was a command for the bot
-	if(handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,state_change,use_pg,db_login)):
+	if(handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login)):
 		#then it's handled and we're done
 		pass
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
