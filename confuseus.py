@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 from socket import *
+from py3net import *
 import config
+import http_cat
 import markov
 import random
 import sys
-import time
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -21,42 +22,6 @@ autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
 host='us.ircnet.org'
 port=6667
-
-buffer_size=1024
-
-#log a line to a file, and also output it for debugging
-def log_line(line,log_file='log.txt'):
-	#timestamp the line
-	line=str(int(time.time()))+' '+line
-	
-	#debug
-	print(line)
-	
-	fp=open(log_file,'a')
-	fp.write(line+"\n")
-	fp.close()
-
-#send a string to a socket in python3
-#s is the socket
-def py3send(s,message):
-	try:
-		s.send(message.encode('latin-1'))
-	except UnicodeEncodeError:
-		print('Err: Unicode to latin-1 conversion error, ignoring message '+str(message))
-
-def py3sendln(s,message):
-	log_line('>> '+message)
-	
-	py3send(s,message+"\n")
-
-#receive a string in python3
-def py3recv(s,byte_count):
-	try:
-		data=s.recv(byte_count)
-		return data.decode('utf-8')
-	except UnicodeDecodeError:
-		print('Err: latin-1 to Unicode conversion error, ignoring this line')
-	return ''
 
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
@@ -116,6 +81,107 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 		lines_since_write=0
 	
 	return (lines_since_write,lines_since_sort_chk)
+
+def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,state_change,use_pg,db_login):
+	handled=False
+	
+	#check if this was a bot command
+	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
+		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		handled=True
+	elif(cmd==(cmd_esc+'help')):
+		if(is_pm):
+			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut   -> generate text based on markov chains')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help  -> displays this command list')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part  -> parts current channel (you can invite to me get back)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c  -> converts temperature from deg F to deg C')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f  -> converts temperature from deg C to deg F')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft -> converts length from meters to feet')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m -> converts length from feet to meters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki  -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
+			
+		handled=True
+	elif(cmd==(cmd_esc+'part')):
+		if(not is_pm):
+			py3sendln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)')
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
+		handled=True
+	elif(cmd==(cmd_esc+'f->c')):
+		try:
+			f=float(line_post_cmd)
+			c=f_to_c(f)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(f)+' degrees F is '+str(c)+' degrees C')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'c->f')):
+		try:
+			c=float(line_post_cmd)
+			f=c_to_f(c)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(c)+' degrees C is '+str(f)+' degrees F')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'m->ft')):
+		try:
+			m=float(line_post_cmd)
+			ft=m_to_ft(m)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(m)+' meters is '+str(ft)+' feet')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'ft->m')):
+		try:
+			ft=float(line_post_cmd)
+			m=ft_to_m(ft)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(ft)+' feet is '+str(m)+' meters')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'wiki')):
+		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
+		try:
+			wiki_title=line_post_cmd.replace(' ','_')
+			wiki_url='https://en.wikipedia.org/wiki/'+wiki_title
+			response=http_cat.get_page(wiki_url)
+			response_type=response[0].split("\n")[0].rstrip("\r")
+			if(response_type.find('200 OK')<0):
+				py3sendln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"')
+			else:
+				wiki_text=response[1]
+				if(wiki_text==''):
+					py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text')
+				else:
+					#get the first paragraph and throw out nested html tags
+					wiki_text=http_cat.html_parse_first(wiki_text,'<p>','</p>')
+					max_p_len=768
+					wiki_text=wiki_text[0:max_p_len]
+					line_len=300
+					while(wiki_text!=''):
+						line_delimiter='. '
+						prd_idx=wiki_text.find(line_delimiter)
+						if(prd_idx>=0):
+							prd_idx+=len(line_delimiter)
+							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:prd_idx])
+							wiki_text=wiki_text[prd_idx:]
+						else:
+							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len])
+							wiki_text=wiki_text[line_len:]
+			py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url)
+		except:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text')
+		handled=True
+	elif(cmd.startswith(cmd_esc)):
+#		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
+		handled=True
+	
+	return handled
+
 
 def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	#get some information (user, nick, host, etc.)
@@ -180,59 +246,9 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		
 		return (lines_since_write,lines_since_sort_chk)
 		
-	
-	#check if this was a bot command
-	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
-		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
-		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
-	elif(cmd==(cmd_esc+'help')):
-		if(is_pm):
-			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut   -> generate text based on markov chains')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help  -> displays this command list')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part  -> parts current channel (you can invite to me get back)')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c  -> converts temperature from deg F to deg C')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f  -> converts temperature from deg C to deg F')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft -> converts length from meters to feet')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m -> converts length from feet to meters')
-		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
-			
-	elif(cmd==(cmd_esc+'part')):
-		if(not is_pm):
-			py3sendln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)')
-		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
-	elif(cmd==(cmd_esc+'f->c')):
-		try:
-			f=float(line_post_cmd)
-			c=f_to_c(f)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(f)+' degrees F is '+str(c)+' degrees C')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
-	elif(cmd==(cmd_esc+'c->f')):
-		try:
-			c=float(line_post_cmd)
-			f=c_to_f(c)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(c)+' degrees C is '+str(f)+' degrees F')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
-	elif(cmd==(cmd_esc+'m->ft')):
-		try:
-			m=float(line_post_cmd)
-			ft=m_to_ft(m)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(m)+' meters is '+str(ft)+' feet')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
-	elif(cmd==(cmd_esc+'ft->m')):
-		try:
-			ft=float(line_post_cmd)
-			m=ft_to_m(ft)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(ft)+' feet is '+str(m)+' meters')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
-	elif(cmd.startswith(cmd_esc)):
-#		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
+	#if this was a command for the bot
+	if(handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,state_change,use_pg,db_login)):
+		#then it's handled and we're done
 		pass
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
@@ -324,7 +340,7 @@ def main(state_file):
 	
 	done=False
 	while(not done):
-		data=py3recv(sock,buffer_size)
+		data=py3recv(sock,BUFFER_SIZE)
 		
 		#carry over from previous lines that weren't newline-terminated
 		data=carry+data
