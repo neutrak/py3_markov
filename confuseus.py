@@ -172,7 +172,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 						else:
 							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len])
 							wiki_text=wiki_text[line_len:]
-			py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url)
+				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url)
 		except:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text')
 		handled=True
