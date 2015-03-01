@@ -149,7 +149,18 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			wiki_title=line_post_cmd.replace(' ','_')
 			wiki_url='https://en.wikipedia.org/wiki/'+wiki_title
 			response=http_cat.get_page(wiki_url)
+			
 			response_type=response[0].split("\n")[0].rstrip("\r")
+			
+			#if we get a 301 moved and the page requested was lower case then
+			#before giving up try it as upper-case
+			if((response_type.find('301 Moved')>=0) and (line_post_cmd[0]==line_post_cmd[0].lower())):
+				return handle_bot_cmd(sock,cmd_esc,
+					cmd,
+					(line_post_cmd[0].upper())+(line_post_cmd[1:]),
+					channel,
+					is_pm,state_change,use_pg,db_login)
+			
 			if(response_type.find('200 OK')<0):
 				py3sendln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"')
 			else:
