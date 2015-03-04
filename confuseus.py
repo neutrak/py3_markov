@@ -57,6 +57,15 @@ def ft_to_m(ft):
 def m_to_ft(m):
 	return m*3.281
 
+#determine if the given text is an odd number of question marks
+def odd_quest(txt):
+	for idx in range(0,len(txt)):
+		if(txt[idx]!='?'):
+			return False
+	if((len(txt)%2)==1):
+		return True
+	return False
+
 def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	#writing back to the state file and checking the sorting are expensive operations
 	#as such, they're not done every line, but only every n lines, as specified here
@@ -189,6 +198,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
 #		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
+		handled=True
+	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
+	#to "fuck with Proview"
+	elif((len(cmd)>1) and odd_quest(cmd)):
+		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		handled=True
 	
 	return handled
