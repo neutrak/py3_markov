@@ -160,6 +160,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+str(result[0]))
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result))
+		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
 		try:
