@@ -6,6 +6,7 @@ import config
 import http_cat
 import markov
 import random
+import rpn
 import sys
 
 #for the database backend which significantly reduces RAM use
@@ -109,6 +110,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f  -> converts temperature from deg C to deg F')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft -> converts length from meters to feet')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m -> converts length from feet to meters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc  -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki  -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
@@ -152,6 +154,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		except ValueError:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
 		handled=True
+	elif(cmd==(cmd_esc+'calc')):
+		result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
+		if(len(result)==1):
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(result[0]))
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result))
 	elif(cmd==(cmd_esc+'wiki')):
 		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
 		try:
