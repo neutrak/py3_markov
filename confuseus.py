@@ -8,6 +8,7 @@ import markov
 import random
 import rpn
 import sys
+import time
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -21,6 +22,7 @@ except ImportError:
 bot_nick='confuseus'
 autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
+dbg_channels=['+confuseus-dbg']
 host='us.ircnet.org'
 port=6667
 
@@ -92,12 +94,21 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 	
 	return (lines_since_write,lines_since_sort_chk)
 
+def dbg_output(sock,dbg_str):
+	for chan in dbg_channels:
+		for line in dbg_str.split("\n"):
+			if(line!=''):
+				py3sendln(sock,'PRIVMSG '+chan+' :'+line)
+				time.sleep(0.5)
+
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
 	handled=False
 	
+	dbg_str=''
+	
 	#check if this was a bot command
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
-		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
@@ -211,11 +222,11 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
 	#to "fuck with Proview"
 	elif((len(cmd)>1) and odd_quest(cmd)):
-		output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		handled=True
 	
-	return handled
+	return (handled,dbg_str)
 
 
 def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
@@ -243,6 +254,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	success,cmd,line_post_cmd=get_token(line,' ')
 	
+	dbg_str=''
+	
+	#at ente's request; allow users in "debug" channels to read the bot's mind
+#	net_dbg=False
+	net_dbg=True
+	
 	cmd_esc='!'
 	
 	#support question/answer style markov chain-ing stuff
@@ -266,12 +283,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			print('Chose a random word to start from ('+words[rand_word_idx]+'), back_gen is '+str(back_gen))
 			
 			#try to use a word from the user
-			output=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+			output,dbg_str=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=back_gen)
 			
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
 		if(output=='' or output==words[rand_word_idx]):
-			output=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		
@@ -279,12 +296,17 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#go ahead and include these lines in the learning set
 		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 		
+		dbg_output(sock,dbg_str)
+		
 		return (lines_since_write,lines_since_sort_chk)
 		
 	#if this was a command for the bot
-	if(handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login)):
+	cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login)
+	if(cmd_handled):
 		#then it's handled and we're done
-		pass
+		
+		#debug if the command gave us a debug string
+		dbg_str=cmd_dbg_str
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
 		#if this was a pm then let the user know how to get help if they want it
@@ -292,6 +314,10 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			py3sendln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)')
 		
 		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
+	
+	#if we're debugging over the network, then output to the debug channels
+	if(net_dbg):
+		dbg_output(sock,dbg_str)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	
@@ -322,7 +348,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
-		for channel in autojoin_channels:
+		for channel in autojoin_channels+dbg_channels:
 			py3sendln(sock,'JOIN :'+channel)
 	#nick in use, so change nick
 	elif(server_cmd=='433'):

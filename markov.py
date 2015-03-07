@@ -354,13 +354,13 @@ def chain_from(text,state_change=[],prefix=['',''],verbose_dbg=False,check_sorte
 #default prefix of ['',''] generates from starting states
 #note that because this is recursive and python doesn't TCO,
 #word_limit must be less than max recursion depth
-def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True,use_pg=False,db_login=None,back_gen=False):
+def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=True,use_pg=False,db_login=None,back_gen=False,dbg_str=''):
 	#trim leading whitespace just to be pretty
 	acc=acc.lstrip(' ')
 	
 	#if we hit the word limit, return now
 	if(word_limit<1):
-		return acc
+		return (acc,dbg_str)
 	
 	#total count of all states that come from the given prefix
 	#this is used so we can calculate probabilities based on state counts
@@ -404,6 +404,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	if(verbose_dbg):
 		print('markov.generate debug 0, got '+str(len(transition_states))+' transition states for prefix '+str(prefix))
+		dbg_str+='[dbg] got '+str(len(transition_states))+' transition states for prefix '+str(prefix)+"\n"
 	
 	#the states which indicate transitions starting from the given suffix
 	#(1st word of accumulator)
@@ -428,6 +429,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	if(verbose_dbg and back_gen):
 		print('markov.generate debug 1, got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix))
+		dbg_str+='[dbg] got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix)+"\n"
 	
 	if(back_gen and (len(back_transition_states)>0)):
 		back_state_idx=random.randint(0,len(back_transition_states)-1)
@@ -446,7 +448,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#no transition state was found (nothing with that prefix),
 	#return accumulator now
 	if(prefix_count==0):
-		return acc
+		return (acc,dbg_str)
 	
 	#now make a random number from 0 to prefix_count,
 	#to determine which state to transition to
@@ -455,7 +457,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	for state in transition_states:
 		#we found our next state, so go to it (recursively)
 		if(next_state_idx<state.count):
-			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix,use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+			return generate(state_change,[prefix[1],state.suffix],word_limit-1,acc+' '+state.suffix,use_pg=use_pg,db_login=db_login,back_gen=back_gen,dbg_str=dbg_str)
 		
 		#we didn't find the state yet,
 		#but there was some probability that it was this state
@@ -469,7 +471,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#print an error and return accumulator
 	print('Err: generate did not correctly determine which suffix to use, we messed up bad!')
 	
-	return acc
+	return (acc,dbg_str)
 
 #saves the state change to a file, for easy reading later
 def save_state_change_to_file(state_change,filename):
