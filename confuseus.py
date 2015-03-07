@@ -113,7 +113,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc  -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki  -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut to generate text; PM for more detailed help')
+			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
 			
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
