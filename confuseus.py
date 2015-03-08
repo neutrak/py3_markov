@@ -20,8 +20,8 @@ except ImportError:
 	db_login=None
 
 bot_nick='confuseus'
-#autojoin_channels=['#imgurians','#imgurians-tech']
-autojoin_channels=['#imgurians-tech'] #testing
+autojoin_channels=['#imgurians','#imgurians-tech']
+#autojoin_channels=['#imgurians-tech'] #testing
 dbg_channels=['+confuseus-dbg']
 host='us.ircnet.org'
 port=6667
