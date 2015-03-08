@@ -124,6 +124,10 @@ def is_op(c):
 	#boolean operators are also incuded
 	return c=='^' or c=='*' or c=='/' or c=='%' or c=='+' or c=='-' or c=='(' or c==')' or c=='&&' or c=='||' or c=='~' or c=='>' or c=='<' or c=='='
 
+#is this character valid as part of a number?
+def is_numeric(c):
+	return (c>='0' and c<='9') or c=='.'
+
 #reads a token
 def get_token(exp,i):
 	#accumulate the token in here
@@ -153,6 +157,27 @@ def get_token(exp,i):
 def rpn_translate(exp):
 	#remove spaces
 	exp=exp.replace(' ','')
+	
+	#for a - which is not preceded by a number, precede it by 0 and put parens around the operation
+	new_exp=''
+	close_paren_cnt=0
+	i=0
+	while i<len(exp):
+		if(exp[i]=='-'):
+			if((i==0) or (not is_numeric(exp[i-1]))):
+				new_exp+='(0'
+				close_paren_cnt+=1
+		elif(not is_numeric(exp[i])):
+			if(i>0 and is_numeric(exp[i-1])):
+				if(close_paren_cnt>0):
+					new_exp+=')'
+					close_paren_cnt-=1
+		new_exp+=exp[i]
+		i+=1
+	while(close_paren_cnt>0):
+		new_exp+=')'
+		close_paren_cnt-=1
+	exp=new_exp
 	
 	#the operator stack (appended to as we find operators)
 	op_stack=[]
