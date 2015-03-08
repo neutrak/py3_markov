@@ -473,6 +473,46 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	return (acc,dbg_str)
 
+#generate from a given starting string
+def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1):
+	output=''
+	dbg_str=''
+	
+	#pick a random word the user said and start generating from there
+	words=start_str.split(' ')
+	if(len(words)>0):
+		rand_word_idx=random.randint(0,len(words)-1)
+		
+		#sometimes back-generate and sometimes don't
+		#just to mess with people :)
+#		back_gen=bool(random.getrandbits(1))
+		
+		#back_gen broke cases where the user
+		#intended to start from a given word
+		#so it's disabled
+		back_gen=False
+		
+		#all the existing state transitions have 2-word prefixes
+		#so that's the length we'll use
+		prefix_len=2
+		
+		prefix_words=[]
+		n=rand_word_idx
+		while((n<len(words)) and (n<(rand_word_idx+start_word_cnt)) and (n<(rand_word_idx+prefix_len))):
+			prefix_words.append(words[n])
+			n+=1
+		while(len(prefix_words)<prefix_len):
+			prefix_words=['']+prefix_words
+		
+		print('Chose a random word list to start from '+str(prefix_words)+', back_gen is '+str(back_gen))
+		
+		#try to use a word from the user
+		output,dbg_str=generate(state_change,prefix=prefix_words,acc=' '.join(prefix_words),use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+		if(output==' '.join(prefix_words)):
+			output=''
+	return output,dbg_str
+
+
 #saves the state change to a file, for easy reading later
 def save_state_change_to_file(state_change,filename):
 	try:

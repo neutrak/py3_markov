@@ -20,8 +20,8 @@ except ImportError:
 	db_login=None
 
 bot_nick='confuseus'
-autojoin_channels=['#imgurians','#imgurians-tech']
-#autojoin_channels=['#imgurians-tech'] #testing
+#autojoin_channels=['#imgurians','#imgurians-tech']
+autojoin_channels=['#imgurians-tech'] #testing
 dbg_channels=['+confuseus-dbg']
 host='us.ircnet.org'
 port=6667
@@ -108,8 +108,13 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	
 	#check if this was a bot command
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
-		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		output=''
+		if(line_post_cmd!=''):
+			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1)
+		if(output==''):
+			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
@@ -212,7 +217,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 						else:
 							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len])
 							wiki_text=wiki_text[line_len:]
-				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url)
+#				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url) #link the wiki page itself?
 		except:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text')
 		handled=True
@@ -264,31 +269,14 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
-		output=''
+		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1)
 		
-		#pick a random word the user said and start generating from there
-		words=line_post_cmd.split(' ')
-		if(len(words)>0):
-			rand_word_idx=random.randint(0,len(words)-1)
-			
-			#sometimes back-generate and sometimes don't
-			#just to mess with people :)
-#			back_gen=bool(random.getrandbits(1))
-			
-			#back_gen broke cases where the user
-			#intended confuseus to start from a given word
-			#so it's disabled
-			back_gen=False
-			
-			print('Chose a random word to start from ('+words[rand_word_idx]+'), back_gen is '+str(back_gen))
-			
-			#try to use a word from the user
-			output,dbg_str=markov.generate(state_change,prefix=['',words[rand_word_idx]],acc=words[rand_word_idx],use_pg=use_pg,db_login=db_login,back_gen=back_gen)
-			
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
-		if(output=='' or output==words[rand_word_idx]):
+		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		
+		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
 		
