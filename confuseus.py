@@ -99,7 +99,7 @@ def dbg_output(sock,dbg_str):
 		for line in dbg_str.split("\n"):
 			if(line!=''):
 				py3sendln(sock,'PRIVMSG '+chan+' :'+line)
-				time.sleep(0.5)
+				time.sleep(random.uniform(0.1,1.5))
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
 	handled=False
@@ -110,7 +110,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
 		output=''
 		if(line_post_cmd!=''):
-			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1)
+			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
@@ -269,7 +269,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
-		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1)
+		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
 		
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)

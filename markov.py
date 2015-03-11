@@ -360,7 +360,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	#if we hit the word limit, return now
 	if(word_limit<1):
-		return (acc,dbg_str)
+		return (acc.rstrip(' '),dbg_str)
 	
 	#total count of all states that come from the given prefix
 	#this is used so we can calculate probabilities based on state counts
@@ -448,7 +448,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#no transition state was found (nothing with that prefix),
 	#return accumulator now
 	if(prefix_count==0):
-		return (acc,dbg_str)
+		return (acc.rstrip(' '),dbg_str)
 	
 	#now make a random number from 0 to prefix_count,
 	#to determine which state to transition to
@@ -471,26 +471,26 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	#print an error and return accumulator
 	print('Err: generate did not correctly determine which suffix to use, we messed up bad!')
 	
-	return (acc,dbg_str)
+	return (acc.rstrip(' '),dbg_str)
 
 #generate from a given starting string
-def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1):
+def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,retries_left=0):
 	output=''
 	dbg_str=''
+
+	#sometimes back-generate and sometimes don't
+	#just to mess with people :)
+#	back_gen=bool(random.getrandbits(1))
+	
+	#back_gen broke cases where the user
+	#intended to start from a given word
+	#so it's disabled
+	back_gen=False
 	
 	#pick a random word the user said and start generating from there
 	words=start_str.split(' ')
 	if(len(words)>0):
 		rand_word_idx=random.randint(0,len(words)-1)
-		
-		#sometimes back-generate and sometimes don't
-		#just to mess with people :)
-#		back_gen=bool(random.getrandbits(1))
-		
-		#back_gen broke cases where the user
-		#intended to start from a given word
-		#so it's disabled
-		back_gen=False
 		
 		#all the existing state transitions have 2-word prefixes
 		#so that's the length we'll use
@@ -508,8 +508,18 @@ def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1):
 		
 		#try to use a word from the user
 		output,dbg_str=generate(state_change,prefix=prefix_words,acc=' '.join(prefix_words),use_pg=use_pg,db_login=db_login,back_gen=back_gen)
-		if(output==' '.join(prefix_words)):
-			output=''
+		
+		print('start_str is '+str(start_str)+', output is '+str(output)+', retries_left='+str(retries_left))
+		
+		#retry if we didn't get anything good (don't just repeat the user)
+		if((output==(' '.join(prefix_words)).lstrip(' ')) or (output==start_str)):
+			if(retries_left>0):
+				return gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt,retries_left-1)
+			else:
+				output=''
+	if(output==''):
+		output,dbg_str=generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+	
 	return output,dbg_str
 
 
