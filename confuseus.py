@@ -60,6 +60,14 @@ def ft_to_m(ft):
 def m_to_ft(m):
 	return m*3.281
 
+#unit conversion kilograms to pounds (on earth)
+def kg_to_lb(kg):
+	return kg*2.205
+
+#unit conversion pounds (on earth) to kilograms
+def lb_to_kg(lb):
+	return lb*0.4536
+
 #determine if the given text is an odd number of question marks
 def odd_quest(txt):
 	for idx in range(0,len(txt)):
@@ -119,15 +127,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut   -> generate text based on markov chains')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help  -> displays this command list')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part  -> parts current channel (you can invite to me get back)')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c  -> converts temperature from deg F to deg C')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f  -> converts temperature from deg C to deg F')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft -> converts length from meters to feet')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m -> converts length from feet to meters')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc  -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki  -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c   -> converts temperature from deg F to deg C')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f   -> converts temperature from deg C to deg F')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft  -> converts length from meters to feet')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m  -> converts length from feet to meters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'kg->lb -> converts kilograms mass to pounds force (ON EARTH)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'lb->kg -> converts pounds force (ON EARTH) to kilograms mass')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
 			
@@ -169,6 +179,22 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+str(ft)+' feet is '+str(m)+' meters')
 		except ValueError:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'kg->lb')):
+		try:
+			kg=float(line_post_cmd)
+			lb=kg_to_lb(kg)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(kg)+' kilograms is '+str(lb)+' pounds under earth-surface gravity')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'lb->kg')):
+		try:
+			lb=float(line_post_cmd)
+			kg=lb_to_kg(lb)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+str(lb)+' pounds under earth-surface gravity is '+str(kg)+' kilograms')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
 		handled=True
 	elif(cmd==(cmd_esc+'calc')):
 		result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
