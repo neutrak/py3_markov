@@ -19,6 +19,8 @@ except ImportError:
 	use_pg=False
 	db_login=None
 
+SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
+
 bot_nick='confuseus'
 autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
@@ -137,7 +139,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'kg->lb -> converts kilograms mass to pounds force (ON EARTH)')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'lb->kg -> converts pounds force (ON EARTH) to kilograms mass')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
+#			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
 			
@@ -204,6 +207,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result))
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
+		#disabled because we have another bot to do this now
+		return (True,dbg_str)
+		
 		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
 		try:
 			wiki_title=line_post_cmd.replace(' ','_')
@@ -243,9 +249,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 						else:
 							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len])
 							wiki_text=wiki_text[line_len:]
-#				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url) #link the wiki page itself?
+				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url) #link the wiki page itself?
 		except:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text')
+		handled=True
+	elif(cmd==(cmd_esc+'source')):
+		py3sendln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL)
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
 #		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
