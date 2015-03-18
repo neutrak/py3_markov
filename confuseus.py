@@ -261,10 +261,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		handled=True
 	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
 	#to "fuck with Proview"
-	elif((len(cmd)>1) and odd_quest(cmd)):
-		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
-		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
-		handled=True
+#	elif((len(cmd)>1) and odd_quest(cmd)):
+#		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+#		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+#		handled=True
 	
 	return (handled,dbg_str)
 
