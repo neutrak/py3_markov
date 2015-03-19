@@ -9,6 +9,7 @@ import random
 import rpn
 import sys
 import time
+import ssl
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -25,8 +26,9 @@ bot_nick='confuseus'
 autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
 dbg_channels=['+confuseus-dbg']
-host='us.ircnet.org'
-port=6667
+host='ssl.irc.atw-inter.net'
+port=6697
+use_ssl=True
 
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
@@ -388,7 +390,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	return (lines_since_write,lines_since_sort_chk)
 	
 
-def main(state_file):
+def main(state_file,use_ssl=True):
 	global bot_nick
 	
 	state_change=None
@@ -407,6 +409,12 @@ def main(state_file):
 	sock=socket(AF_INET,SOCK_STREAM)
 	try:
 		sock.connect((host,port))
+		
+		if(use_ssl):
+			#do an ssl handshake and use ssl
+			#NOTE: this does NOT do cert checking and so could easily be mitm'd
+			#but anything's better than nothing
+			sock=ssl.wrap_socket(sock)
 	except:
 		print('Err: Could not connect to '+host+' on port '+str(port))
 		return 1
@@ -466,5 +474,5 @@ if(__name__=='__main__'):
 			db_login=markov.db_info(pg_user,pg_passwd,pg_dbname)
 			print('using postgres database '+db_login.db_name+' for input and output of state changes')
 	
-	main(config.get_json_param(config.read_json_file(config_file),'state_file'))
+	main(config.get_json_param(config.read_json_file(config_file),'state_file'),use_ssl=use_ssl)
 
