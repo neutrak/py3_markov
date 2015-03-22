@@ -10,6 +10,7 @@ import rpn
 import sys
 import time
 import ssl
+import json
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -143,6 +144,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 #			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database')
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
 			
@@ -258,6 +260,48 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	elif(cmd==(cmd_esc+'source')):
 		py3sendln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL)
 		handled=True
+	elif(cmd==(cmd_esc+'omdb')):
+		if(line_post_cmd!=''):
+			title_words=line_post_cmd.rstrip(' ').split(' ')
+			for i in range(0,len(title_words)):
+				if(title_words[i][0]==title_words[i][0].lower()):
+					title_words[i]=title_words[i][0].upper()+title_words[i][1:]
+			url='http://www.omdbapi.com/?t='+('+'.join(title_words))+'&y=&plot=short&r=json'
+			try:
+				response=http_cat.get_page(url)
+			except:
+				py3sendln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)')
+				return (True,dbg_str)
+			
+			response_type=response[0].split("\n")[0].rstrip("\r")
+			if(response_type.find('200 OK')<0):
+				py3sendln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"')
+			else:
+				try:
+					json_tree=json.loads(response[1])
+				except ValueError:
+					py3sendln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb')
+					return (True,dbg_str)
+				
+				#movie information now that retrieval is done
+				title=config.get_json_param(json_tree,'Title')
+				title='' if title==None else title
+				rating=config.get_json_param(json_tree,'imdbRating')
+				rating='' if rating==None else rating
+				year=config.get_json_param(json_tree,'Year')
+				year='' if year==None else year
+				#remove unicode to be IRC-friendly
+				year=year.replace('–','-')
+				genre=config.get_json_param(json_tree,'Genre')
+				genre='' if genre==None else genre
+				plot=config.get_json_param(json_tree,'Plot')
+				plot='' if plot==None else plot
+				
+				py3sendln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot)
+		else:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter')
+		handled=True
+
 	elif(cmd.startswith(cmd_esc)):
 #		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
 		handled=True
