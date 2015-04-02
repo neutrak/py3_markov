@@ -73,6 +73,22 @@ def kg_to_lb(kg):
 def lb_to_kg(lb):
 	return lb*0.4536
 
+#unit conversion miles to kilometers
+def mi_to_km(mi):
+	return mi*1.609334
+
+#unit conversion kilometers to miles
+def km_to_mi(km):
+	return km/mi_to_km(1)
+
+#unit conversion inches to centimeters
+def in_to_cm(inches):
+	return inches*2.54
+
+#unit conversion centimeters to inches
+def cm_to_in(cm):
+	return cm/in_to_cm(1)
+
 #determine if the given text is an odd number of question marks
 def odd_quest(txt):
 	for idx in range(0,len(txt)):
@@ -114,6 +130,97 @@ def dbg_output(sock,dbg_str):
 				py3sendln(sock,'PRIVMSG '+chan+' :'+line)
 				time.sleep(random.uniform(0.1,1.5))
 
+#round so numbers look nice on IRC
+def round_nstr(num):
+	return '%10.5f' % num
+
+def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
+	handled=False
+	
+	if(cmd==(cmd_esc+'f->c')):
+		try:
+			f=float(line_post_cmd)
+			c=f_to_c(f)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(f)+' degrees F is '+round_nstr(c)+' degrees C')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'c->f')):
+		try:
+			c=float(line_post_cmd)
+			f=c_to_f(c)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(c)+' degrees C is '+round_nstr(f)+' degrees F')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'m->ft')):
+		try:
+			m=float(line_post_cmd)
+			ft=m_to_ft(m)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(m)+' meters is '+round_nstr(ft)+' feet')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'ft->m')):
+		try:
+			ft=float(line_post_cmd)
+			m=ft_to_m(ft)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(ft)+' feet is '+round_nstr(m)+' meters')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'kg->lb')):
+		try:
+			kg=float(line_post_cmd)
+			lb=kg_to_lb(kg)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(kg)+' kilograms is '+round_nstr(lb)+' pounds under earth-surface gravity')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'lb->kg')):
+		try:
+			lb=float(line_post_cmd)
+			kg=lb_to_kg(lb)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(lb)+' pounds under earth-surface gravity is '+round_nstr(kg)+' kilograms')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'in->cm')):
+		try:
+			inches=float(line_post_cmd)
+			cm=in_to_cm(inches)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(inches)+' inches is '+round_nstr(cm)+' centimeters')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: in->cm requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'cm->in')):
+		try:
+			cm=float(line_post_cmd)
+			inches=cm_to_in(cm)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(cm)+' centimeters is '+round_nstr(inches)+' inches')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: cm->in requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'mi->km')):
+		try:
+			mi=float(line_post_cmd)
+			km=mi_to_km(mi)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(mi)+' miles is '+round_nstr(km)+' kilometers')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: mi->km requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'km->mi')):
+		try:
+			km=float(line_post_cmd)
+			mi=km_to_mi(km)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(km)+' kilometers is '+round_nstr(mi)+' miles')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: km->mi requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	
+	return handled
+
+
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
 	handled=False
 	
@@ -141,6 +248,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m  -> converts length from feet to meters')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'kg->lb -> converts kilograms mass to pounds force (ON EARTH)')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'lb->kg -> converts pounds force (ON EARTH) to kilograms mass')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'in->cm -> converts length from inches to centimeters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'cm->in -> converts length from centimeters to inches')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'mi->km -> converts length from miles to kilometers')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'km->mi -> converts length from kilometers to miles')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 #			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
@@ -155,53 +266,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
 		handled=True
-	elif(cmd==(cmd_esc+'f->c')):
-		try:
-			f=float(line_post_cmd)
-			c=f_to_c(f)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(f)+' degrees F is '+str(c)+' degrees C')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'c->f')):
-		try:
-			c=float(line_post_cmd)
-			f=c_to_f(c)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(c)+' degrees C is '+str(f)+' degrees F')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'m->ft')):
-		try:
-			m=float(line_post_cmd)
-			ft=m_to_ft(m)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(m)+' meters is '+str(ft)+' feet')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'ft->m')):
-		try:
-			ft=float(line_post_cmd)
-			m=ft_to_m(ft)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(ft)+' feet is '+str(m)+' meters')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'kg->lb')):
-		try:
-			kg=float(line_post_cmd)
-			lb=kg_to_lb(kg)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(kg)+' kilograms is '+str(lb)+' pounds under earth-surface gravity')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'lb->kg')):
-		try:
-			lb=float(line_post_cmd)
-			kg=lb_to_kg(lb)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(lb)+' pounds under earth-surface gravity is '+str(kg)+' kilograms')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
+	#conversions are their own function now
+	elif(handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel)):
 		handled=True
 	elif(cmd==(cmd_esc+'calc')):
 		result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
