@@ -132,7 +132,7 @@ def dbg_output(sock,dbg_str):
 
 #round so numbers look nice on IRC
 def round_nstr(num):
-	return '%10.5f' % num
+	return ('%10.5f' % num).lstrip(' ')
 
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	handled=False
