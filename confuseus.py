@@ -196,11 +196,7 @@ def dbg_output(sock,dbg_str):
 def round_nstr(num):
 	return ('%10.5f' % num).lstrip(' ')
 
-#TODO: generalize conversions better;
-#there's a lot of repeated code and new units are always being added
-#maybe make a "conversion" struct or class which would contain "from abbr" "to abbr" "conv factor" and "display units" (for to and from)
-#that way a new conversion would be like a one-liner
-
+#handle conversions (stored in a generic unit_conv list)
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	global unit_conv_list
 	handled=False
