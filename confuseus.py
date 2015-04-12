@@ -230,21 +230,21 @@ def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 		except ValueError:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: km->mi requires a number, but I couldn\'t find one in your argument')
 		handled=True
-	elif(cmd==(cmd_esc+'oz->li')):
+	elif(cmd==(cmd_esc+'oz->l')):
 		try:
 			oz=float(line_post_cmd)
 			li=oz_to_li(oz)
 			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(oz)+' fluid ounces is '+round_nstr(li)+' liters')
 		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: oz->li requires a number, but I couldn\'t find one in your argument')
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: oz->l requires a number, but I couldn\'t find one in your argument')
 		handled=True
-	elif(cmd==(cmd_esc+'li->oz')):
+	elif(cmd==(cmd_esc+'l->oz')):
 		try:
 			li=float(line_post_cmd)
 			oz=li_to_oz(li)
 			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(li)+' liters is '+round_nstr(oz)+' fluid ounces')
 		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: li->oz requires a number, but I couldn\'t find one in your argument')
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: l->oz requires a number, but I couldn\'t find one in your argument')
 		handled=True
 	
 	return handled
@@ -281,8 +281,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'cm->in -> converts length from centimeters to inches')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'mi->km -> converts length from miles to kilometers')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'km->mi -> converts length from kilometers to miles')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oz->li -> converts volume from fluid ounces to liters')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'li->oz -> converts volume from liters to fluid ounces')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oz->l  -> converts volume from fluid ounces to liters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'l->oz  -> converts volume from liters to fluid ounces')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 #			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
