@@ -89,6 +89,14 @@ def in_to_cm(inches):
 def cm_to_in(cm):
 	return cm/in_to_cm(1)
 
+#unit conversion fluid ounces to liters
+def oz_to_li(oz):
+	return oz*0.02957
+
+#unit conversion liters to fluid ounces
+def li_to_oz(li):
+	return li/oz_to_li(1)
+
 #determine if the given text is an odd number of question marks
 def odd_quest(txt):
 	for idx in range(0,len(txt)):
@@ -133,6 +141,11 @@ def dbg_output(sock,dbg_str):
 #round so numbers look nice on IRC
 def round_nstr(num):
 	return ('%10.5f' % num).lstrip(' ')
+
+#TODO: generalize conversions better;
+#there's a lot of repeated code and new units are always being added
+#maybe make a "conversion" struct or class which would contain "from abbr" "to abbr" "conv factor" and "display units" (for to and from)
+#that way a new conversion would be like a one-liner
 
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	handled=False
@@ -217,6 +230,22 @@ def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 		except ValueError:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: km->mi requires a number, but I couldn\'t find one in your argument')
 		handled=True
+	elif(cmd==(cmd_esc+'oz->li')):
+		try:
+			oz=float(line_post_cmd)
+			li=oz_to_li(oz)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(oz)+' fluid ounces is '+round_nstr(li)+' liters')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: oz->li requires a number, but I couldn\'t find one in your argument')
+		handled=True
+	elif(cmd==(cmd_esc+'li->oz')):
+		try:
+			li=float(line_post_cmd)
+			oz=li_to_oz(li)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(li)+' liters is '+round_nstr(oz)+' fluid ounces')
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: li->oz requires a number, but I couldn\'t find one in your argument')
+		handled=True
 	
 	return handled
 
@@ -252,6 +281,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'cm->in -> converts length from centimeters to inches')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'mi->km -> converts length from miles to kilometers')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'km->mi -> converts length from kilometers to miles')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oz->li -> converts volume from fluid ounces to liters')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'li->oz -> converts volume from liters to fluid ounces')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 #			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
