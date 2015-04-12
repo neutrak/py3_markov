@@ -31,6 +31,35 @@ host='ssl.irc.atw-inter.net'
 port=6697
 use_ssl=True
 
+#a list of all unit conversions we currently support
+unit_conv_list=[]
+
+#a class to handle unit conversions in a generic way
+#having a seperate case for each was leading to a lot of unnecessary duplication
+class unit_conv:
+	def __init__(self,dimension,from_abbr,from_disp,to_abbr,to_disp,conv_func):
+		self.dimension=dimension
+		self.from_abbr=from_abbr
+		self.from_disp=from_disp
+		self.to_abbr=to_abbr
+		self.to_disp=to_disp
+		self.conv_func=conv_func
+	
+	def chk_cmd(self,cmd_esc,cmd):
+		#note this is case-insensitive;
+		#HOPEFULLY this isn't a problem...
+		if((cmd.lower())==(cmd_esc+self.from_abbr+'->'+self.to_abbr)):
+			return True
+		return False
+	
+	def output_conv(self,sock,channel,line_post_cmd):
+		try:
+			from_val=float(line_post_cmd)
+			to_val=self.conv_func(from_val)
+			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(from_val)+' '+self.from_disp+' is '+round_nstr(to_val)+' '+self.to_disp)
+		except ValueError:
+			py3sendln(sock,'PRIVMSG '+channel+' :Err: '+self.from_abbr+'->'+self.to_abbr+' requires a number, but I couldn\'t find one in your argument')
+
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
 	success=False
@@ -49,53 +78,78 @@ def get_token(text,delimiter):
 	
 	return (success,token,text)
 
+
 #unit conversion deg F to deg C
 def f_to_c(f):
 	return (5.0/9.0)*(f-32)
+
+unit_conv_list.append(unit_conv('temperature','f','degrees F','c','degrees C',f_to_c))
 
 #unit conversion deg C to deg F
 def c_to_f(c):
 	return ((9.0/5.0)*c)+32
 
+unit_conv_list.append(unit_conv('temperature','c','degrees C','f','degrees F',c_to_f))
+
 #unit conversion feet to meters
 def ft_to_m(ft):
 	return ft*0.3048
+
+unit_conv_list.append(unit_conv('length','ft','feet','m','meters',ft_to_m))
 
 #unit conversion meters to feet
 def m_to_ft(m):
 	return m*3.281
 
+unit_conv_list.append(unit_conv('length','m','meters','ft','feet',m_to_ft))
+
 #unit conversion kilograms to pounds (on earth)
 def kg_to_lb(kg):
 	return kg*2.205
+
+unit_conv_list.append(unit_conv('mass->force','kg','kilograms','lb','pounds under earth-surface gravity',kg_to_lb))
 
 #unit conversion pounds (on earth) to kilograms
 def lb_to_kg(lb):
 	return lb*0.4536
 
+unit_conv_list.append(unit_conv('force->mass','lb','pounds under earth-surface gravity','kg','kilograms',lb_to_kg))
+
 #unit conversion miles to kilometers
 def mi_to_km(mi):
 	return mi*1.609334
+
+unit_conv_list.append(unit_conv('length','mi','miles','km','kilometers',mi_to_km))
 
 #unit conversion kilometers to miles
 def km_to_mi(km):
 	return km/mi_to_km(1)
 
+unit_conv_list.append(unit_conv('length','km','kilometers','mi','miles',km_to_mi))
+
 #unit conversion inches to centimeters
 def in_to_cm(inches):
 	return inches*2.54
+
+unit_conv_list.append(unit_conv('length','in','inches','cm','centimeters',in_to_cm))
 
 #unit conversion centimeters to inches
 def cm_to_in(cm):
 	return cm/in_to_cm(1)
 
+unit_conv_list.append(unit_conv('length','cm','centimeters','in','inches',cm_to_in))
+
 #unit conversion fluid ounces to liters
 def oz_to_li(oz):
 	return oz*0.02957
 
+unit_conv_list.append(unit_conv('volume','oz','fluid ounces','l','liters',oz_to_li))
+
 #unit conversion liters to fluid ounces
 def li_to_oz(li):
 	return li/oz_to_li(1)
+
+unit_conv_list.append(unit_conv('volume','l','liters','oz','fluid ounces',li_to_oz))
 
 #determine if the given text is an odd number of question marks
 def odd_quest(txt):
@@ -148,109 +202,19 @@ def round_nstr(num):
 #that way a new conversion would be like a one-liner
 
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
+	global unit_conv_list
 	handled=False
 	
-	if(cmd==(cmd_esc+'f->c')):
-		try:
-			f=float(line_post_cmd)
-			c=f_to_c(f)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(f)+' degrees F is '+round_nstr(c)+' degrees C')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: f->c requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'c->f')):
-		try:
-			c=float(line_post_cmd)
-			f=c_to_f(c)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(c)+' degrees C is '+round_nstr(f)+' degrees F')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: c->f requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'m->ft')):
-		try:
-			m=float(line_post_cmd)
-			ft=m_to_ft(m)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(m)+' meters is '+round_nstr(ft)+' feet')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: m->ft requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'ft->m')):
-		try:
-			ft=float(line_post_cmd)
-			m=ft_to_m(ft)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(ft)+' feet is '+round_nstr(m)+' meters')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: ft->m requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'kg->lb')):
-		try:
-			kg=float(line_post_cmd)
-			lb=kg_to_lb(kg)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(kg)+' kilograms is '+round_nstr(lb)+' pounds under earth-surface gravity')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'lb->kg')):
-		try:
-			lb=float(line_post_cmd)
-			kg=lb_to_kg(lb)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(lb)+' pounds under earth-surface gravity is '+round_nstr(kg)+' kilograms')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: kg->lb requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'in->cm')):
-		try:
-			inches=float(line_post_cmd)
-			cm=in_to_cm(inches)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(inches)+' inches is '+round_nstr(cm)+' centimeters')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: in->cm requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'cm->in')):
-		try:
-			cm=float(line_post_cmd)
-			inches=cm_to_in(cm)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(cm)+' centimeters is '+round_nstr(inches)+' inches')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: cm->in requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'mi->km')):
-		try:
-			mi=float(line_post_cmd)
-			km=mi_to_km(mi)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(mi)+' miles is '+round_nstr(km)+' kilometers')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: mi->km requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'km->mi')):
-		try:
-			km=float(line_post_cmd)
-			mi=km_to_mi(km)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(km)+' kilometers is '+round_nstr(mi)+' miles')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: km->mi requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'oz->l')):
-		try:
-			oz=float(line_post_cmd)
-			li=oz_to_li(oz)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(oz)+' fluid ounces is '+round_nstr(li)+' liters')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: oz->l requires a number, but I couldn\'t find one in your argument')
-		handled=True
-	elif(cmd==(cmd_esc+'l->oz')):
-		try:
-			li=float(line_post_cmd)
-			oz=li_to_oz(li)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(li)+' liters is '+round_nstr(oz)+' fluid ounces')
-		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: l->oz requires a number, but I couldn\'t find one in your argument')
-		handled=True
+	for conversion in unit_conv_list:
+		if(conversion.chk_cmd(cmd_esc,cmd)):
+			conversion.output_conv(sock,channel,line_post_cmd)
+			handled=True
 	
 	return handled
 
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
+	global unit_conv_list
 	handled=False
 	
 	dbg_str=''
@@ -271,18 +235,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'f->c   -> converts temperature from deg F to deg C')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'c->f   -> converts temperature from deg C to deg F')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'m->ft  -> converts length from meters to feet')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'ft->m  -> converts length from feet to meters')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'kg->lb -> converts kilograms mass to pounds force (ON EARTH)')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'lb->kg -> converts pounds force (ON EARTH) to kilograms mass')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'in->cm -> converts length from inches to centimeters')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'cm->in -> converts length from centimeters to inches')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'mi->km -> converts length from miles to kilometers')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'km->mi -> converts length from kilometers to miles')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oz->l  -> converts volume from fluid ounces to liters')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'l->oz  -> converts volume from liters to fluid ounces')
+			for conversion in unit_conv_list:
+				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr
+				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXX')):
+					help_str+=' '
+				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
+				py3sendln(sock,help_str)
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
 #			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
