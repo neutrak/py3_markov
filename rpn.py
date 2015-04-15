@@ -165,8 +165,11 @@ def rpn_translate(exp):
 	while i<len(exp):
 		if(exp[i]=='-'):
 			if((i==0) or (not is_numeric(exp[i-1]))):
-				new_exp+='(0'
-				close_paren_cnt+=1
+				if(((i+1)<len(exp)) and (exp[i+1]=='-' or is_numeric(exp[i+1]))):
+					new_exp+='(0'
+					close_paren_cnt+=1
+				else:
+					new_exp+='0'
 		elif(not is_numeric(exp[i])):
 			if(i>0 and is_numeric(exp[i-1])):
 				if(close_paren_cnt>0):
@@ -346,6 +349,9 @@ def rpn_eval(rpn_exp,verbose=False):
 				else:
 					if(verbose):
 						print('Warning: Too few arguments, skipping '+stack[i]+' operation...')
+			except ZeroDivisionError:
+				if(verbose):
+					print('Warning: Division by 0; skipping...')
 
 		i+=1
 	return stack
