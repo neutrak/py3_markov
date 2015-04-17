@@ -7,6 +7,7 @@ import http_cat
 import markov
 import random
 import rpn
+import diff_tool
 import sys
 import time
 import ssl
@@ -24,8 +25,8 @@ except ImportError:
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 
 bot_nick='confuseus'
-autojoin_channels=['#imgurians','#imgurians-tech']
-#autojoin_channels=['#imgurians-tech'] #testing
+#autojoin_channels=['#imgurians','#imgurians-tech']
+autojoin_channels=['#imgurians-tech'] #testing
 #dbg_channels=['+confuseus-dbg']
 dbg_channels=[]
 host='ssl.irc.atw-inter.net'
@@ -232,16 +233,18 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list')
 			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
+#			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database')
+			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk -> checks given word against a dictionary and suggests fixes')
 			for conversion in unit_conv_list:
 				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr
 				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXX')):
 					help_str+=' '
 				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
 				py3sendln(sock,help_str)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
-#			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database')
+
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
 			
@@ -352,6 +355,37 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 				py3sendln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot)
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter')
+		handled=True
+	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck'))):
+		max_words_per_line=1
+		words_on_line=0
+		for chk_word in line_post_cmd.split(' '):
+			if(words_on_line>=max_words_per_line):
+				break
+			
+			spellcheck_output=''
+			match,close_words=diff_tool.spellcheck(chk_word,diff_tool.get_dictionary(hard_fail=False),1)
+			if(match):
+				spellcheck_output+='CORRECT: \''+chk_word+'\' is in my dictionary'
+			else:
+				spellcheck_output+='INCORRECT: \''+chk_word+'\' is NOT in my dictionary; you may mean: '
+				max_fix_words=5
+				fix_word_cnt=0
+				for fix_word in close_words:
+					if(fix_word_cnt>=max_fix_words):
+						break
+					
+					if(fix_word_cnt!=0):
+						spellcheck_output+=', '
+					spellcheck_output+=fix_word
+					fix_word_cnt+=1
+				
+				if(fix_word_cnt>=max_fix_words):
+					spellcheck_output+=', ...'
+			
+			py3sendln(sock,'PRIVMSG '+channel+' :'+spellcheck_output)
+			
+			words_on_line+=1
 		handled=True
 
 	elif(cmd.startswith(cmd_esc)):
