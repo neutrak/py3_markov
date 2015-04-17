@@ -25,8 +25,8 @@ except ImportError:
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 
 bot_nick='confuseus'
-#autojoin_channels=['#imgurians','#imgurians-tech']
-autojoin_channels=['#imgurians-tech'] #testing
+autojoin_channels=['#imgurians','#imgurians-tech']
+#autojoin_channels=['#imgurians-tech'] #testing
 #dbg_channels=['+confuseus-dbg']
 dbg_channels=[]
 host='ssl.irc.atw-inter.net'
