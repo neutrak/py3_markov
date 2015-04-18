@@ -73,7 +73,6 @@ def transpositions(string):
 #check a given word against the dictionary
 def spellcheck(word,dictionary,max_edit_dist):
 	match=False
-	close_words=[]
 	for dict_word in dictionary:
 		if(word==dict_word):
 			match=True
@@ -81,8 +80,10 @@ def spellcheck(word,dictionary,max_edit_dist):
 	
 	word_transpositions=transpositions(word)
 	
+	close_words=[]
 	if(not match):
-		some_transpose_matches=False
+		fuzzy_match_words=[]
+		transpose_match_words=[]
 		for dict_word in dictionary:
 			#optimize by skipping words whose length precludes them from a match
 			if(abs(len(word)-len(dict_word))>max_edit_dist):
@@ -91,9 +92,8 @@ def spellcheck(word,dictionary,max_edit_dist):
 			transpose_match=False
 			for chk_word in word_transpositions:
 				if(chk_word==dict_word):
-					close_words.append(dict_word)
+					transpose_match_words.append(dict_word)
 					transpose_match=True
-					some_transpose_matches=True
 			
 			if(not transpose_match):
 				op_cnt=quick_diff(word,dict_word)[0]
@@ -102,13 +102,17 @@ def spellcheck(word,dictionary,max_edit_dist):
 				#from the given word to the dictionary word
 				#is less than the given max
 				if(op_cnt<=max_edit_dist):
-					close_words.append(dict_word)
+					fuzzy_match_words.append(dict_word)
 		
-		if(not some_transpose_matches):
-			#sort by similarity
-			close_words.reverse()
-			close_words.sort(key=lambda dict_word: similarity_perc(quick_diff(word,dict_word)[0],word,dict_word))
-			close_words.reverse()
+		#sort by similarity
+		#also alphabetize; note that python's sort is in-place
+		fuzzy_match_words.reverse()
+		fuzzy_match_words.sort(key=lambda dict_word: similarity_perc(quick_diff(word,dict_word)[0],word,dict_word))
+		fuzzy_match_words.reverse()
+		
+		#combine both transposition matches and fuzzy matches
+		#to get an ordered list of all close words
+		close_words=transpose_match_words+fuzzy_match_words
 	
 	return (match,close_words)
 
