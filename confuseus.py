@@ -357,6 +357,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter')
 		handled=True
 	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp'))):
+		dictionary=diff_tool.get_dictionary(hard_fail=False)
+		
 		max_words_per_line=1
 		words_on_line=0
 		for chk_word in line_post_cmd.split(' '):
@@ -364,14 +366,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 				break
 			
 			spellcheck_output=''
-			match,close_words=diff_tool.spellcheck(chk_word,diff_tool.get_dictionary(hard_fail=False),1)
+			match,close_words=diff_tool.spellcheck(chk_word,dictionary,1)
 			if(match):
 				spellcheck_output+='CORRECT: \''+chk_word+'\' is in my dictionary'
 			else:
 				spellcheck_output+='INCORRECT: \''+chk_word+'\' is NOT in my dictionary'
 				if(len(close_words)>0):
 					spellcheck_output+='; you may mean: '
-				max_fix_words=5
+				
+				print('[dbg] for \''+chk_word+'\': close_words='+str(close_words))
+				
+				max_fix_words=8
 				fix_word_cnt=0
 				for fix_word in close_words:
 					if(fix_word_cnt>=max_fix_words):

@@ -64,6 +64,12 @@ def get_dictionary(dict_paths=['/usr/dict/words','/usr/share/dict/words'],hard_f
 def similarity_perc(op_cnt,start_line,end_line):
 	return (round((1.0-((op_cnt*1.0)/max(len(start_line),len(end_line))))*100.0,2)) if max(len(start_line),len(end_line))>0 else 100
 
+def transpositions(string):
+	permutations=[]
+	for letter_idx in range(1,len(string)):
+		permutations.append(string[0:letter_idx-1]+string[letter_idx]+string[letter_idx-1]+string[letter_idx+1:])
+	return permutations
+
 #check a given word against the dictionary
 def spellcheck(word,dictionary,max_edit_dist):
 	match=False
@@ -72,24 +78,37 @@ def spellcheck(word,dictionary,max_edit_dist):
 		if(word==dict_word):
 			match=True
 			break
+	
+	word_transpositions=transpositions(word)
+	
 	if(not match):
+		some_transpose_matches=False
 		for dict_word in dictionary:
 			#optimize by skipping words whose length precludes them from a match
 			if(abs(len(word)-len(dict_word))>max_edit_dist):
 				continue
 			
-			op_cnt=quick_diff(word,dict_word)[0]
+			transpose_match=False
+			for chk_word in word_transpositions:
+				if(chk_word==dict_word):
+					close_words.append(dict_word)
+					transpose_match=True
+					some_transpose_matches=True
 			
-			#consider a word "close" if the edit distance
-			#from the given word to the dictionary word
-			#is less than the given max
-			if(op_cnt<=max_edit_dist):
-				close_words.append(dict_word)
+			if(not transpose_match):
+				op_cnt=quick_diff(word,dict_word)[0]
+				
+				#consider a word "close" if the edit distance
+				#from the given word to the dictionary word
+				#is less than the given max
+				if(op_cnt<=max_edit_dist):
+					close_words.append(dict_word)
 		
-		#sort by similarity
-		close_words.reverse()
-		close_words.sort(key=lambda dict_word: similarity_perc(quick_diff(word,dict_word)[0],word,dict_word))
-		close_words.reverse()
+		if(not some_transpose_matches):
+			#sort by similarity
+			close_words.reverse()
+			close_words.sort(key=lambda dict_word: similarity_perc(quick_diff(word,dict_word)[0],word,dict_word))
+			close_words.reverse()
 	
 	return (match,close_words)
 
@@ -113,6 +132,7 @@ if(__name__=='__main__'):
 	if(option.lower().startswith('y')):
 		dictionary=get_dictionary()
 		for word in [start_line,end_line]:
+			print('Transpositions: '+str(transpositions(word)))
 			if(word.find(' ')==-1):
 				match,close_words=spellcheck(word,dictionary,1)
 				if(match):
