@@ -356,17 +356,38 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		else:
 			py3sendln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter')
 		handled=True
-	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp'))):
+	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp')) or (cmd==(cmd_esc+'spell'))):
 		dictionary=diff_tool.get_dictionary(hard_fail=False)
 		
-		max_words_per_line=1
+		#by default a word is close if it is one or fewer edits away from the given word
+		edit_distance=1
+		chk_words=line_post_cmd.split(' ')
+		
+		#if requested, use a user-given edit distance to allow for more word suggestions
+		#custom edit distance is the /last/ space-delimited argument
+		#(multiple words may be given before it)
+		if(len(chk_words)>1 and chk_words[-1].isdigit()):
+			edit_distance=int(chk_words[-1])
+			chk_words=chk_words[0:len(chk_words)-1]
+		
+		#limit edit distance to <=5 though,
+		#so we don't time out or get words that don't make any sense
+		edit_distance=min(edit_distance,5)
+		
+		#how many words we can be requested to spell in a single call
+		#words after this limit will be ignored
+		max_words_per_line=2
+		
 		words_on_line=0
-		for chk_word in line_post_cmd.split(' '):
+		for chk_word in chk_words:
+			#skip words after the max
 			if(words_on_line>=max_words_per_line):
 				break
 			
+			#check this word; spellcheck uses a edit distance based fuzzy match internally
+			#note that transpositions are included as a special case within the spellcheck function
 			spellcheck_output=''
-			match,close_words=diff_tool.spellcheck(chk_word,dictionary,1)
+			match,close_words=diff_tool.spellcheck(chk_word,dictionary,edit_distance)
 			if(match):
 				spellcheck_output+='CORRECT: \''+chk_word+'\' is in my dictionary'
 			else:
