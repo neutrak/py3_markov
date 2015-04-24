@@ -164,7 +164,7 @@ def rpn_translate(exp):
 	i=0
 	while i<len(exp):
 		if(exp[i]=='-'):
-			if((i==0) or (not is_numeric(exp[i-1]))):
+			if((i==0) or ((not is_numeric(exp[i-1])) and (exp[i-1]!=')'))):
 				if(((i+1)<len(exp)) and (exp[i+1]=='-' or is_numeric(exp[i+1]))):
 					new_exp+='(0'
 					close_paren_cnt+=1
@@ -180,6 +180,9 @@ def rpn_translate(exp):
 	while(close_paren_cnt>0):
 		new_exp+=')'
 		close_paren_cnt-=1
+	
+	print('Evaluating: '+new_exp) #debug
+	
 	exp=new_exp
 	
 	#the operator stack (appended to as we find operators)
