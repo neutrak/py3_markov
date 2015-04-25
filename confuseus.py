@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from socket import *
 from py3net import *
+import socket
 import config
 import http_cat
 import markov
@@ -12,6 +12,7 @@ import sys
 import time
 import ssl
 import json
+import errno
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -25,15 +26,24 @@ except ImportError:
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 
 bot_nick='confuseus'
+
 autojoin_channels=['#imgurians','#imgurians-tech']
 #autojoin_channels=['#imgurians-tech'] #testing
-#dbg_channels=['+confuseus-dbg']
-dbg_channels=[]
+#autojoin_channels=[]
+
+dbg_channels=['+confuseus-dbg']
+#dbg_channels=[]
+
 host='ssl.irc.atw-inter.net'
 port=6697
 use_ssl=True
 
+#host='us.ircnet.org'
+#port=6667
+#use_ssl=False
+
 #a list of all unit conversions we currently support
+#this will be populated as the conversion functions get defined
 unit_conv_list=[]
 
 #a class to handle unit conversions in a generic way
@@ -58,9 +68,9 @@ class unit_conv:
 		try:
 			from_val=float(line_post_cmd)
 			to_val=self.conv_func(from_val)
-			py3sendln(sock,'PRIVMSG '+channel+' :'+round_nstr(from_val)+' '+self.from_disp+' is '+round_nstr(to_val)+' '+self.to_disp)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+round_nstr(from_val)+' '+self.from_disp+' is '+round_nstr(to_val)+' '+self.to_disp,1)
 		except ValueError:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: '+self.from_abbr+'->'+self.to_abbr+' requires a number, but I couldn\'t find one in your argument')
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: '+self.from_abbr+'->'+self.to_abbr+' requires a number, but I couldn\'t find one in your argument',1)
 
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
@@ -191,8 +201,8 @@ def dbg_output(sock,dbg_str):
 	for chan in dbg_channels:
 		for line in dbg_str.split("\n"):
 			if(line!=''):
-				py3sendln(sock,'PRIVMSG '+chan+' :'+line)
-				time.sleep(random.uniform(0.1,1.5))
+				py3queueln(sock,'PRIVMSG '+chan+' :'+line,4)
+#				time.sleep(random.uniform(0.1,1.5))
 
 #round so numbers look nice on IRC
 def round_nstr(num):
@@ -224,36 +234,36 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
-		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
-			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally')
-#			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database')
-			py3sendln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk -> checks given word against a dictionary and suggests fixes')
+			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
+#			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk -> checks given word against a dictionary and suggests fixes',3)
 			for conversion in unit_conv_list:
 				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr
 				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXX')):
 					help_str+=' '
 				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
-				py3sendln(sock,help_str)
+				py3queueln(sock,help_str,3)
 
 		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help')
+			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
 			
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
 		if(not is_pm):
-			py3sendln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)')
+			py3queueln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)',1)
 		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!')
+			py3queueln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!',1)
 		handled=True
 	#conversions are their own function now
 	elif(handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel)):
@@ -261,9 +271,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	elif(cmd==(cmd_esc+'calc')):
 		result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
 		if(len(result)==1):
-			py3sendln(sock,'PRIVMSG '+channel+' :'+str(result[0]))
+			py3queueln(sock,'PRIVMSG '+channel+' :'+str(result[0]),1)
 		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result))
+			py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#disabled because we have another bot to do this now
@@ -287,11 +297,11 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 					is_pm,state_change,use_pg,db_login)
 			
 			if(response_type.find('200 OK')<0):
-				py3sendln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"')
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
 			else:
 				wiki_text=response[1]
 				if(wiki_text==''):
-					py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text')
+					py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text',1)
 				else:
 					#get the first paragraph and throw out nested html tags
 					wiki_text=http_cat.html_parse_first(wiki_text,'<p>','</p>')
@@ -303,17 +313,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 						prd_idx=wiki_text.find(line_delimiter)
 						if(prd_idx>=0):
 							prd_idx+=len(line_delimiter)
-							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:prd_idx])
+							py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:prd_idx],1)
 							wiki_text=wiki_text[prd_idx:]
 						else:
-							py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len])
+							py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len],1)
 							wiki_text=wiki_text[line_len:]
-				py3sendln(sock,'PRIVMSG '+channel+' :'+wiki_url) #link the wiki page itself?
+				py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_url,1) #link the wiki page itself?
 		except:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text')
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
 		handled=True
 	elif(cmd==(cmd_esc+'source')):
-		py3sendln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL)
+		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
 	elif(cmd==(cmd_esc+'omdb')):
 		if(line_post_cmd!=''):
@@ -325,17 +335,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			try:
 				response=http_cat.get_page(url)
 			except:
-				py3sendln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)')
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)',1)
 				return (True,dbg_str)
 			
 			response_type=response[0].split("\n")[0].rstrip("\r")
 			if(response_type.find('200 OK')<0):
-				py3sendln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"')
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
 			else:
 				try:
 					json_tree=json.loads(response[1])
 				except ValueError:
-					py3sendln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb')
+					py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb',1)
 					return (True,dbg_str)
 				
 				#movie information now that retrieval is done
@@ -352,9 +362,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 				plot=config.get_json_param(json_tree,'Plot')
 				plot='' if plot==None else plot
 				
-				py3sendln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot)
+				py3queueln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot,1)
 		else:
-			py3sendln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter')
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter',1)
 		handled=True
 	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp')) or (cmd==(cmd_esc+'spell'))):
 		dictionary=diff_tool.get_dictionary(hard_fail=False)
@@ -411,19 +421,19 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 				if(fix_word_cnt>=max_fix_words):
 					spellcheck_output+=', ...'
 			
-			py3sendln(sock,'PRIVMSG '+channel+' :'+spellcheck_output)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+spellcheck_output,1)
 			
 			words_on_line+=1
 		handled=True
 
 	elif(cmd.startswith(cmd_esc)):
-#		py3sendln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help')
+#		py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
 		handled=True
 	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
 	#to "fuck with Proview"
 #	elif((len(cmd)>1) and odd_quest(cmd)):
 #		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
-#		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+#		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 #		handled=True
 	
 	return (handled,dbg_str)
@@ -473,7 +483,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		
 		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		
-		py3sendln(sock,'PRIVMSG '+channel+' :'+output)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+output,4)
 		
 		#because people often talk to the bot in complete phrases,
 		#go ahead and include these lines in the learning set
@@ -494,7 +504,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	else:
 		#if this was a pm then let the user know how to get help if they want it
 		if(is_pm):
-			py3sendln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)')
+			py3queueln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)',3)
 		
 		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	
@@ -516,7 +526,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	if(line.startswith('PING')):
 		success,ping,msg=get_token(line,' :')
 		if(success):
-			py3sendln(sock,'PONG :'+msg)
+			py3queueln(sock,'PONG :'+msg,0)
 		return (lines_since_write,lines_since_sort_chk)
 	#error, so exit
 	elif(line.startswith('ERROR')):
@@ -532,18 +542,18 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
 		for channel in autojoin_channels+dbg_channels:
-			py3sendln(sock,'JOIN :'+channel)
+			py3queueln(sock,'JOIN :'+channel,1)
 	#nick in use, so change nick
 	elif(server_cmd=='433'):
 		bot_nick+='_'
-		py3sendln(sock,'NICK :'+bot_nick)
+		py3queueln(sock,'NICK :'+bot_nick,1)
 	#got a PM, so reply
 	elif(server_cmd=='PRIVMSG'):
 		lines_since_write,lines_since_sort_chk=handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	#got an invite, so join
 	elif(server_cmd=='INVITE'):
 		succcesss,name,channel=get_token(line,' :')
-		py3sendln(sock,'JOIN :'+channel)
+		py3queueln(sock,'JOIN :'+channel,1)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	
@@ -564,11 +574,16 @@ def main(state_file,use_ssl=True):
 	print('Creating connection to '+host+' on port '+str(port)+'...')
 	
 	#tcp client socket
-	sock=socket(AF_INET,SOCK_STREAM)
+	sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+	base_sock=None
 	try:
 		sock.connect((host,port))
 		
 		if(use_ssl):
+			#store the non-ssl underlying socket
+			#because we need to set non-blocking on THAT
+			base_sock=sock
+			
 			#do an ssl handshake and use ssl
 			#NOTE: this does NOT do cert checking and so could easily be mitm'd
 			#but anything's better than nothing
@@ -577,6 +592,11 @@ def main(state_file,use_ssl=True):
 		print('Err: Could not connect to '+host+' on port '+str(port))
 		return 1
 	
+	#set the socket to be non-blocking
+	#this will throw a socket.error when there is no data to read
+	if(use_ssl):
+		base_sock.setblocking(0)
+	sock.setblocking(0)
 	
 	py3sendln(sock,'NICK :'+bot_nick)
 	py3sendln(sock,'USER '+bot_nick+' 2 3 4')
@@ -590,7 +610,34 @@ def main(state_file,use_ssl=True):
 	
 	done=False
 	while(not done):
-		data=py3recv(sock,BUFFER_SIZE)
+		#send a line from the outgoing queue
+		#if the outgoing queue is empty this does nothing
+		if(py3send_queue(sock)):
+			#we want our queue priorities to actually matter
+			#so after sending something, wait a second or 2
+			#so that our receiving buffer can actually be ready to read any additional data
+			#before we send more
+			time.sleep(1.5)
+		
+		data=''
+		try:
+#			print('Dbg: Waiting for data...')
+			data=py3recv(sock,BUFFER_SIZE)
+		except ssl.SSLWantReadError:
+			#wait 0.05 seconds before trying to read (or write) again
+			#don't want to hog the CPU
+			time.sleep(0.05)
+		except socket.error as e:
+			err=e.args[0]
+			if(err==errno.EAGAIN or err==errno.EWOULDBLOCK):
+				#wait 0.05 seconds before trying to read (or write) again
+				#don't want to hog the CPU
+				time.sleep(0.05)
+			else:
+				#if we got a real error (not just out of data) then exit
+				print('Err: Socket Error: '+str(e))
+				done=True
+			continue
 		
 		#carry over from previous lines that weren't newline-terminated
 		data=carry+data
@@ -607,6 +654,12 @@ def main(state_file,use_ssl=True):
 		
 		if(line!=''):
 			carry=line
+	
+	print('Err: Connection Closed')
+	
+	#if we got here then we're totally finished
+	#so close the socket
+	sock.close()
 
 #runtime
 if(__name__=='__main__'):
