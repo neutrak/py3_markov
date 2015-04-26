@@ -275,7 +275,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
 			for err_idx in range(0,len(err_msgs)):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]))
+				py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#disabled because we have another bot to do this now
