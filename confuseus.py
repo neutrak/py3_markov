@@ -485,7 +485,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		
 		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :'+output,4)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 		
 		#because people often talk to the bot in complete phrases,
 		#go ahead and include these lines in the learning set
