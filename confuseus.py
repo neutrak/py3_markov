@@ -543,6 +543,9 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
+		#mark us as being a bot (since we are)
+		#on networks that recognize that
+		py3queueln(sock,'MODE '+bot_nick+' +B',1)
 		for channel in autojoin_channels+dbg_channels:
 			py3queueln(sock,'JOIN :'+channel,1)
 	#nick in use, so change nick
