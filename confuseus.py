@@ -633,6 +633,7 @@ def main(state_file,use_ssl=True):
 			#don't want to hog the CPU
 			time.sleep(0.05)
 			read_finished=True
+			continue
 		except socket.error as e:
 			err=e.args[0]
 			if(err==errno.EAGAIN or err==errno.EWOULDBLOCK):
