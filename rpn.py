@@ -257,6 +257,8 @@ def rpn_eval(rpn_exp,verbose=False):
 	
 #	print(stack)
 	
+	err_msgs=[]
+	
 	#go through the stack and make appropriate replacements
 	i=0
 	while (i<len(stack)):
@@ -346,18 +348,26 @@ def rpn_eval(rpn_exp,verbose=False):
 				if(len(stack)>2):
 					#if one of these operands was an operator then we can't continue (stack not simplified enough)
 					if(is_op(stack[i-2]) or is_op(stack[i-1])):
-						return stack
+						return (err_msgs,stack)
 					if(verbose):
 						print('Warning: Could not convert stack objects to numbers, skipping '+stack[i-2]+stack[i]+stack[i-1]+' operation...')
+						err_msgs.append('Skipped '+stack[i-2]+stack[i]+stack[i-1])
 				else:
 					if(verbose):
 						print('Warning: Too few arguments, skipping '+stack[i]+' operation...')
+					err_msgs.append('Skipped '+stack[i]+' (too few arguments)')
 			except ZeroDivisionError:
 				if(verbose):
 					print('Warning: Division by 0; skipping...')
+				err_msgs.append('Div by 0 on '+stack[i-2]+stack[i]+stack[i-1])
+					
+			except OverflowError:
+				if(verbose):
+					print('Warning: Overflow error; skipping...')
+				err_msgs.append('Overflow on '+stack[i-2]+stack[i]+stack[i-1])
 
 		i+=1
-	return stack
+	return (err_msgs,stack)
 
 
 if(__name__=='__main__'):
@@ -400,7 +410,7 @@ if(__name__=='__main__'):
 		print(rpn_exp)
 		print('')
 
-	rpn_result=rpn_eval(rpn_exp,verbose)
+	err_msgs,rpn_result=rpn_eval(rpn_exp,verbose)
 
 	if(verbose):
 		print('')
