@@ -240,17 +240,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut    -> generate text based on markov chains',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help   -> displays this command list',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part   -> parts current channel (you can invite to me get back)',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc   -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-#			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki   -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source -> links the github url for this bot\'s source code',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb   -> grabs movie information from the open movie database',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk -> checks given word against a dictionary and suggests fixes',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
+#			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
 			for conversion in unit_conv_list:
-				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr
-				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXX')):
+				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
+				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
 					help_str+=' '
 				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
 				py3queueln(sock,help_str,3)
@@ -598,8 +598,8 @@ def main(state_file,use_ssl=True):
 		base_sock.setblocking(0)
 	sock.setblocking(0)
 	
-	py3sendln(sock,'NICK :'+bot_nick)
-	py3sendln(sock,'USER '+bot_nick+' 2 3 4')
+	py3queueln(sock,'NICK :'+bot_nick)
+	py3queueln(sock,'USER '+bot_nick+' 2 3 4')
 	
 	#initialize counters for events that only happen every n lines
 	lines_since_write=100
@@ -608,17 +608,20 @@ def main(state_file,use_ssl=True):
 	#carry from multi-line reads
 	carry=''
 	
+	read_finished=True
 	done=False
 	while(not done):
-		#send a line from the outgoing queue
-		#if the outgoing queue is empty this does nothing
-		if(py3send_queue(sock)):
-			#we want our queue priorities to actually matter
-			#so after sending something, wait a second or 2
-			#so that our receiving buffer can actually be ready to read any additional data
-			#before we send more
-			time.sleep(1.5)
+		if(read_finished):
+			#send a line from the outgoing queue
+			#if the outgoing queue is empty this does nothing
+			if(py3send_queue(sock)):
+				#we want our queue priorities to actually matter
+				#so after sending something, wait a second or 2
+				#so that our receiving buffer can actually be ready to read any additional data
+				#before we send more
+				time.sleep(1.5)
 		
+		read_finished=False
 		data=''
 		try:
 #			print('Dbg: Waiting for data...')
@@ -627,12 +630,14 @@ def main(state_file,use_ssl=True):
 			#wait 0.05 seconds before trying to read (or write) again
 			#don't want to hog the CPU
 			time.sleep(0.05)
+			read_finished=True
 		except socket.error as e:
 			err=e.args[0]
 			if(err==errno.EAGAIN or err==errno.EWOULDBLOCK):
 				#wait 0.05 seconds before trying to read (or write) again
 				#don't want to hog the CPU
 				time.sleep(0.05)
+				read_finished=True
 			else:
 				#if we got a real error (not just out of data) then exit
 				print('Err: Socket Error: '+str(e))
