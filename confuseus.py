@@ -429,8 +429,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		handled=True
 
 	elif(cmd.startswith(cmd_esc)):
-#		py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
-		handled=True
+		if(is_pm):
+			py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
+		
+		#this prevents the bot from learning from unrecognized ! commands
+		#(which are usually meant for another bot)
+#		handled=True
 	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
 	#to "fuck with Proview"
 #	elif((len(cmd)>1) and odd_quest(cmd)):
