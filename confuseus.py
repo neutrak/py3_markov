@@ -461,6 +461,14 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	#debug
 	log_line('['+channel+'] <'+nick+'> '+line)
 	
+	#strip trailing whitespace because users expect that to not matter
+	line=line.rstrip(' ').rstrip("\t")
+	
+	#and now because whitespace is gone it's possible to have a blank line
+	#so ignore blank lines
+	if(line==''):
+		return (lines_since_write,lines_since_sort_chk)
+	
 	#if they PM'd us, then PM 'em right back
 	#that'll show 'em
 	is_pm=False
