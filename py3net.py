@@ -66,6 +66,12 @@ def py3flushq(s):
 	while(len(send_queue)>0):
 		py3sendqueue(s)
 
+#clear the queue WITHOUT sending
+#this can LOSE output!!!
+def py3clearq():
+	global send_queue
+	send_queue=[]
+
 #receive a string in python3
 def py3recv(s,byte_count):
 	try:

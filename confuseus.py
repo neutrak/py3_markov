@@ -42,6 +42,11 @@ use_ssl=True
 #port=6667
 #use_ssl=False
 
+#users allowed to !shup the bot
+#(aka clear outgoing queue)
+#TODO: if this list is ever used for anything more important, be sure to authenticate in some way, or at least check for channel ops
+authed_users=['neutrak','NuclearWaffle','Proview','ente','GargajCNS','tard','hobbitlover','thetardis','Tanswedes']
+
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
 unit_conv_list=[]
@@ -220,8 +225,114 @@ def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	
 	return handled
 
+#handle an omdb command
+def handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	if(line_post_cmd!=''):
+		title_words=line_post_cmd.rstrip(' ').split(' ')
+		for i in range(0,len(title_words)):
+			if(title_words[i][0]==title_words[i][0].lower()):
+				title_words[i]=title_words[i][0].upper()+title_words[i][1:]
+		url='http://www.omdbapi.com/?t='+('+'.join(title_words))+'&y=&plot=short&r=json'
+		try:
+			response=http_cat.get_page(url)
+		except:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)',1)
+			return (True,dbg_str)
+		
+		response_type=response[0].split("\n")[0].rstrip("\r")
+		if(response_type.find('200 OK')<0):
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
+		else:
+			try:
+				json_tree=json.loads(response[1])
+			except ValueError:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb',1)
+				return (True,dbg_str)
+			
+			#movie information now that retrieval is done
+			title=config.get_json_param(json_tree,'Title')
+			title='' if title==None else title
+			rating=config.get_json_param(json_tree,'imdbRating')
+			rating='' if rating==None else rating
+			year=config.get_json_param(json_tree,'Year')
+			year='' if year==None else year
+			#remove unicode to be IRC-friendly
+			year=year.replace('–','-')
+			genre=config.get_json_param(json_tree,'Genre')
+			genre='' if genre==None else genre
+			plot=config.get_json_param(json_tree,'Plot')
+			plot='' if plot==None else plot
+			
+			if((title=='') and (rating=='') and (year=='') and (genre=='') and (plot=='')):
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: No information (movie might not be in omdb, or might not exist)',1)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot,1)
+	else:
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter',1)
 
-def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login):
+
+#handle a spellcheck command
+def handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	dictionary=diff_tool.get_dictionary(hard_fail=False)
+	
+	#by default a word is close if it is one or fewer edits away from the given word
+	edit_distance=1
+	chk_words=line_post_cmd.split(' ')
+	
+	#if requested, use a user-given edit distance to allow for more word suggestions
+	#custom edit distance is the /last/ space-delimited argument
+	#(multiple words may be given before it)
+	if(len(chk_words)>1 and chk_words[-1].isdigit()):
+		edit_distance=int(chk_words[-1])
+		chk_words=chk_words[0:len(chk_words)-1]
+	
+	#limit edit distance to <=5 though,
+	#so we don't time out or get words that don't make any sense
+	edit_distance=min(edit_distance,5)
+	
+	#how many words we can be requested to spell in a single call
+	#words after this limit will be ignored
+	max_words_per_line=2
+	
+	words_on_line=0
+	for chk_word in chk_words:
+		#skip words after the max
+		if(words_on_line>=max_words_per_line):
+			break
+		
+		#check this word; spellcheck uses a edit distance based fuzzy match internally
+		#note that transpositions are included as a special case within the spellcheck function
+		spellcheck_output=''
+		match,close_words=diff_tool.spellcheck(chk_word,dictionary,edit_distance)
+		if(match):
+			spellcheck_output+='CORRECT: \''+chk_word+'\' is in my dictionary'
+		else:
+			spellcheck_output+='INCORRECT: \''+chk_word+'\' is NOT in my dictionary'
+			if(len(close_words)>0):
+				spellcheck_output+='; you may mean: '
+			
+			print('[dbg] for \''+chk_word+'\': close_words='+str(close_words))
+			
+			max_fix_words=8
+			fix_word_cnt=0
+			for fix_word in close_words:
+				if(fix_word_cnt>=max_fix_words):
+					break
+				
+				if(fix_word_cnt!=0):
+					spellcheck_output+=', '
+				spellcheck_output+=fix_word
+				fix_word_cnt+=1
+			
+			if(fix_word_cnt>=max_fix_words):
+				spellcheck_output+=', ...'
+		
+		py3queueln(sock,'PRIVMSG '+channel+' :'+spellcheck_output,1)
+		
+		words_on_line+=1
+
+
+def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global unit_conv_list
 	handled=False
 	
@@ -242,6 +353,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup                      -> clears sending queue (authorized users only)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
 #			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
@@ -258,6 +370,13 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
 			
+		handled=True
+	elif((cmd==(cmd_esc+'shup')) or (cmd==(cmd_esc+'shoo'))):
+		if(nick in authed_users):
+			py3clearq()
+			py3queueln(sock,'PRIVMSG '+channel+' :Outgoing message queue cleared! (someone might be pissed at you if they\'re waiting on output)',1)
+		else:
+			py3queueln(sock,'PRIVMSG '+channel+' :'+nick+': you\'re not authorized to use '+cmd_esc+'shup; queue NOT cleared',1)
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
 		if(not is_pm):
@@ -296,7 +415,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 					cmd,
 					(line_post_cmd[0].upper())+(line_post_cmd[1:]),
 					channel,
-					is_pm,state_change,use_pg,db_login)
+					nick,is_pm,state_change,use_pg,db_login)
 			
 			if(response_type.find('200 OK')<0):
 				py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
@@ -328,106 +447,11 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use
 		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
 	elif(cmd==(cmd_esc+'omdb')):
-		if(line_post_cmd!=''):
-			title_words=line_post_cmd.rstrip(' ').split(' ')
-			for i in range(0,len(title_words)):
-				if(title_words[i][0]==title_words[i][0].lower()):
-					title_words[i]=title_words[i][0].upper()+title_words[i][1:]
-			url='http://www.omdbapi.com/?t='+('+'.join(title_words))+'&y=&plot=short&r=json'
-			try:
-				response=http_cat.get_page(url)
-			except:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)',1)
-				return (True,dbg_str)
-			
-			response_type=response[0].split("\n")[0].rstrip("\r")
-			if(response_type.find('200 OK')<0):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
-			else:
-				try:
-					json_tree=json.loads(response[1])
-				except ValueError:
-					py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb',1)
-					return (True,dbg_str)
-				
-				#movie information now that retrieval is done
-				title=config.get_json_param(json_tree,'Title')
-				title='' if title==None else title
-				rating=config.get_json_param(json_tree,'imdbRating')
-				rating='' if rating==None else rating
-				year=config.get_json_param(json_tree,'Year')
-				year='' if year==None else year
-				#remove unicode to be IRC-friendly
-				year=year.replace('–','-')
-				genre=config.get_json_param(json_tree,'Genre')
-				genre='' if genre==None else genre
-				plot=config.get_json_param(json_tree,'Plot')
-				plot='' if plot==None else plot
-				
-				py3queueln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot,1)
-		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter',1)
+		handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp')) or (cmd==(cmd_esc+'spell'))):
-		dictionary=diff_tool.get_dictionary(hard_fail=False)
-		
-		#by default a word is close if it is one or fewer edits away from the given word
-		edit_distance=1
-		chk_words=line_post_cmd.split(' ')
-		
-		#if requested, use a user-given edit distance to allow for more word suggestions
-		#custom edit distance is the /last/ space-delimited argument
-		#(multiple words may be given before it)
-		if(len(chk_words)>1 and chk_words[-1].isdigit()):
-			edit_distance=int(chk_words[-1])
-			chk_words=chk_words[0:len(chk_words)-1]
-		
-		#limit edit distance to <=5 though,
-		#so we don't time out or get words that don't make any sense
-		edit_distance=min(edit_distance,5)
-		
-		#how many words we can be requested to spell in a single call
-		#words after this limit will be ignored
-		max_words_per_line=2
-		
-		words_on_line=0
-		for chk_word in chk_words:
-			#skip words after the max
-			if(words_on_line>=max_words_per_line):
-				break
-			
-			#check this word; spellcheck uses a edit distance based fuzzy match internally
-			#note that transpositions are included as a special case within the spellcheck function
-			spellcheck_output=''
-			match,close_words=diff_tool.spellcheck(chk_word,dictionary,edit_distance)
-			if(match):
-				spellcheck_output+='CORRECT: \''+chk_word+'\' is in my dictionary'
-			else:
-				spellcheck_output+='INCORRECT: \''+chk_word+'\' is NOT in my dictionary'
-				if(len(close_words)>0):
-					spellcheck_output+='; you may mean: '
-				
-				print('[dbg] for \''+chk_word+'\': close_words='+str(close_words))
-				
-				max_fix_words=8
-				fix_word_cnt=0
-				for fix_word in close_words:
-					if(fix_word_cnt>=max_fix_words):
-						break
-					
-					if(fix_word_cnt!=0):
-						spellcheck_output+=', '
-					spellcheck_output+=fix_word
-					fix_word_cnt+=1
-				
-				if(fix_word_cnt>=max_fix_words):
-					spellcheck_output+=', ...'
-			
-			py3queueln(sock,'PRIVMSG '+channel+' :'+spellcheck_output,1)
-			
-			words_on_line+=1
+		handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
-
 	elif(cmd.startswith(cmd_esc)):
 		if(is_pm):
 			py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
@@ -508,7 +532,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		return (lines_since_write,lines_since_sort_chk)
 		
 	#if this was a command for the bot
-	cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,state_change,use_pg,db_login)
+	cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login)
 	if(cmd_handled):
 		#then it's handled and we're done
 		
@@ -636,7 +660,7 @@ def main(state_file,use_ssl=True):
 				#so after sending something, wait a second or 2
 				#so that our receiving buffer can actually be ready to read any additional data
 				#before we send more
-				time.sleep(1.5)
+				time.sleep(1.0)
 		
 		read_finished=False
 		data=''
