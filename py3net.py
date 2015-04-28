@@ -68,9 +68,18 @@ def py3flushq(s):
 
 #clear the queue WITHOUT sending
 #this can LOSE output!!!
-def py3clearq():
+def py3clearq(min_nice_val):
 	global send_queue
-	send_queue=[]
+	
+	#make a new send queue which discards those messages
+	#whose nice value is >= the given minimum
+	#(aka given priority or lower)
+	new_send_queue=[]
+	for entry in send_queue:
+		if(entry[1]<min_nice_val):
+			new_send_queue.append(entry)
+	
+	send_queue=new_send_queue
 
 #receive a string in python3
 def py3recv(s,byte_count):

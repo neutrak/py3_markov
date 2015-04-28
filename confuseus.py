@@ -371,12 +371,24 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
 			
 		handled=True
+	#clear (low-priority) messages from the output queue
 	elif((cmd==(cmd_esc+'shup')) or (cmd==(cmd_esc+'shoo'))):
+		#the minimum nice value to clear messages from the output queue
+		nice_lvl=4
+		try:
+			nice_lvl=int(line_post_cmd.strip(' '))
+		except ValueError:
+			nice_lvl=4
+		
+		#authorized users can suppress high-priority output
 		if(nick in authed_users):
-			py3clearq()
-			py3queueln(sock,'PRIVMSG '+channel+' :Outgoing message queue cleared! (someone might be pissed at you if they\'re waiting on output)',1)
+			nice_lvl=max(nice_lvl,1)
+		#unauthorized users can only suppress low-priority output
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :'+nick+': you\'re not authorized to use '+cmd_esc+'shup; queue NOT cleared',1)
+			nice_lvl=max(nice_lvl,4)
+		
+		py3clearq(nice_lvl)
+		py3queueln(sock,'PRIVMSG '+channel+' :Info: outgoing message queue cleared of low-priority messages (nice_lvl='+str(nice_lvl)+')',1)
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
 		if(not is_pm):
