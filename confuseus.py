@@ -25,6 +25,8 @@ except ImportError:
 
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 
+#TODO: move bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users to the json config file
+
 bot_nick='confuseus'
 
 autojoin_channels=['#imgurians','#imgurians-tech']
@@ -46,6 +48,11 @@ use_ssl=True
 #(aka clear outgoing queue)
 #TODO: if this list is ever used for anything more important, be sure to authenticate in some way, or at least check for channel ops
 authed_users=['neutrak','NuclearWaffle','Proview','ente','GargajCNS','tard','hobbitlover','thetardis','Tanswedes']
+
+#users to ignore (bots)
+#this is a blacklist, like /ignore in many clients
+#ignored_users=['tard']
+ignored_users=[]
 
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
@@ -496,6 +503,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#debug
 	log_line('['+channel+'] <'+nick+'> '+line)
+	
+	#ignore blacklisted users,
+	#but throw some output on the console so we know that's happening
+	if nick in ignored_users:
+		print('Warn: ignored line from '+nick+' because their nick is blacklisted (ignored)')
+		return (lines_since_write,lines_since_sort_chk)
 	
 	#strip trailing whitespace because users expect that to not matter
 	line=line.rstrip(' ').rstrip("\t")
