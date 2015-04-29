@@ -1,4 +1,25 @@
 {
+	"bot_nick":"confuseus",
+	"host":"ssl.irc.atw-inter.net",
+	"port":6697,
+	"use_ssl":true,
+	"autojoin_channels":[
+		"#imgurians",
+		"#imgurians-tech"
+		],
+	"dbg_channels":[
+		"+confuseus-dbg"
+		],
+	"authed_users":[
+		"neutrak",
+		"ente",
+		"Proview",
+		"hobbitlover",
+		"GargajCNS"
+		],
+	"ignored_users":[
+		],
+	
 	"prefix_len":2,
 	
 	"use_pg":true,

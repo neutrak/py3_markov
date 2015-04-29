@@ -25,34 +25,28 @@ except ImportError:
 
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 
-#TODO: move bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users to the json config file
+#NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users
+#are specified by the json config file; these are just defaults if values are not configured there
+
+#BEGIN JSON-configurable globals ========================================================
 
 bot_nick='confuseus'
-
-autojoin_channels=['#imgurians','#imgurians-tech']
-#autojoin_channels=['#imgurians-tech'] #testing
-#autojoin_channels=[]
-
-dbg_channels=['+confuseus-dbg']
-#dbg_channels=[]
-
+autojoin_channels=[]
+dbg_channels=[]
 host='ssl.irc.atw-inter.net'
 port=6697
 use_ssl=True
 
-#host='us.ircnet.org'
-#port=6667
-#use_ssl=False
-
 #users allowed to !shup the bot
 #(aka clear outgoing queue)
 #TODO: if this list is ever used for anything more important, be sure to authenticate in some way, or at least check for channel ops
-authed_users=['neutrak','NuclearWaffle','Proview','ente','GargajCNS','tard','hobbitlover','thetardis','Tanswedes']
+authed_users=[]
 
 #users to ignore (bots)
 #this is a blacklist, like /ignore in many clients
-#ignored_users=['tard']
 ignored_users=[]
+
+#END JSON-configurable globals ==========================================================
 
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
@@ -360,7 +354,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup                      -> clears sending queue (authorized users only)',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
 #			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
@@ -740,7 +734,46 @@ if(__name__=='__main__'):
 		config_file=sys.argv[1]
 	print('using JSON config file '+config_file)
 	
-	use_pg=config.get_json_param(config.read_json_file(config_file),'use_pg')
+	#read the configuration from the json configuration file
+	json_cfg_tree=config.read_json_file(config_file)
+	
+	#set configuration from the config file
+	#if configuration for anything is omitted a default value from the code is used
+	
+	json_bot_nick=config.get_json_param(json_cfg_tree,'bot_nick')
+	if(json_bot_nick!=None):
+		bot_nick=json_bot_nick
+	
+	json_autojoin_channels=config.get_json_param(json_cfg_tree,'autojoin_channels')
+	if(autojoin_channels!=None):
+		autojoin_channels=json_autojoin_channels
+	
+	json_dbg_channels=config.get_json_param(json_cfg_tree,'dbg_channels')
+	if(dbg_channels!=None):
+		dbg_channels=json_dbg_channels
+	
+	json_host=config.get_json_param(json_cfg_tree,'host')
+	if(host!=None):
+		host=json_host
+	json_port=config.get_json_param(json_cfg_tree,'port')
+	if(port!=None):
+		port=json_port
+	json_use_ssl=config.get_json_param(json_cfg_tree,'use_ssl')
+	if(use_ssl!=None):
+		use_ssl=json_use_ssl
+	
+	json_authed_users=config.get_json_param(json_cfg_tree,'authed_users')
+	if(authed_users!=None):
+		authed_users=json_authed_users
+	
+	json_ignored_users=config.get_json_param(json_cfg_tree,'ignored_users')
+	if(ignored_users!=None):
+		ignored_users=json_ignored_users
+	
+	#IRC-related configuration done
+	#get markov (database) configuration
+	
+	use_pg=config.get_json_param(json_cfg_tree,'use_pg')
 	if(use_pg==None):
 		use_pg=False
 	
