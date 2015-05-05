@@ -13,6 +13,7 @@ import time
 import ssl
 import json
 import errno
+import select
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -671,6 +672,17 @@ def main(state_file,use_ssl=True):
 	read_finished=True
 	done=False
 	while(not done):
+		#if there is data from the user, then add that data to the outgoing queue
+		#this allows the bot to act as a "puppet" or very primitive client
+		stdin_data=select.select([sys.stdin],[],[],0.0)[0]
+		while(len(stdin_data)>0):
+			user_data=stdin_data[0].readline()
+			user_data=user_data.rstrip("\n").rstrip("\r")
+			print('Debug: user_data='+str(user_data))
+			py3queueln(sock,user_data,1)
+			
+			stdin_data=stdin_data[1:]
+		
 		if(read_finished):
 			#send a line from the outgoing queue
 			#if the outgoing queue is empty this does nothing
