@@ -362,6 +362,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]           -> generates random number in range [1,sides]',3)
 			for conversion in unit_conv_list:
 				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
 				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
@@ -465,6 +466,22 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handled=True
 	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp')) or (cmd==(cmd_esc+'spell'))):
 		handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
+		handled=True
+	elif(cmd==(cmd_esc+'dieroll')):
+		sides=6
+		if(line_post_cmd!=''):
+			try:
+				sides=int(line_post_cmd)
+			except ValueError:
+				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid number of sides, assuming d-6',1)
+				sides=6
+		if(sides<1):
+			py3queueln(sock,'PRIVMSG '+channel+' :Warn: Number of sides less than 1, setting number of sides 1 (this will return 1)',1)
+			sides=1
+		
+		value=random.randint(1,sides)
+		py3queueln(sock,'PRIVMSG '+channel+' :Rolled a '+str(value)+' with a d'+str(sides),1)
+		
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		if(is_pm):
