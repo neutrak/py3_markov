@@ -122,6 +122,18 @@ def m_to_ft(m):
 
 unit_conv_list.append(unit_conv('length','m','meters','ft','feet',m_to_ft))
 
+#unit conversion feet to centimeters
+def ft_to_cm(ft):
+	return ft*30.48
+
+unit_conv_list.append(unit_conv('length','ft','feet','cm','centimeters',ft_to_cm))
+
+#unit conversion centimeters to feet
+def cm_to_ft(cm):
+	return cm*0.03281
+
+unit_conv_list.append(unit_conv('length','cm','centimeters','ft','feet',cm_to_ft))
+
 #unit conversion kilograms to pounds (on earth)
 def kg_to_lb(kg):
 	return kg*2.205
