@@ -37,6 +37,7 @@ dbg_channels=[]
 host='ssl.irc.atw-inter.net'
 port=6697
 use_ssl=True
+gen_cmd=True
 
 #users allowed to !shup the bot
 #(aka clear outgoing queue)
@@ -208,6 +209,7 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 	else:
 		print('Warn: Ignoring line \"'+line+'\" because it contained an http link')
 	
+	#for postgre writes are done on every line
 	if(use_pg):
 		lines_since_write=0
 	elif(lines_since_write>=60):
@@ -347,6 +349,7 @@ def handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
+	global gen_cmd
 	global unit_conv_list
 	handled=False
 	
@@ -359,6 +362,13 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		
+		#prevent generating commands directed towards other bots,
+		#if configured to do that
+		if(not gen_cmd):
+			if(output.startswith('!')):
+				output='\\'+output
+		
 		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		handled=True
@@ -506,6 +516,13 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	#to "fuck with Proview"
 #	elif((len(cmd)>1) and odd_quest(cmd)):
 #		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+#		
+#		#prevent generating commands directed towards other bots,
+#		#if configured to do that
+#		if(not gen_cmd):
+#			if(output.startswith('!')):
+#				output='\\'+output
+#		
 #		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 #		handled=True
 	
@@ -513,6 +530,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 
 
 def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
+	global gen_cmd
+	
 	#get some information (user, nick, host, etc.)
 	success,info,line=get_token(line,' ')
 	info=info.lstrip(':')
@@ -567,6 +586,12 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#then just go random (fall back functionality)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		
+		#prevent generating commands directed towards other bots,
+		#if configured to do that
+		if(not gen_cmd):
+			if(output.startswith('!')):
+				output='\\'+output
 		
 		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		
@@ -781,34 +806,43 @@ if(__name__=='__main__'):
 	#set configuration from the config file
 	#if configuration for anything is omitted a default value from the code is used
 	
+	#nick
 	json_bot_nick=config.get_json_param(json_cfg_tree,'bot_nick')
 	if(json_bot_nick!=None):
 		bot_nick=json_bot_nick
 	
+	#channels to join on startup
 	json_autojoin_channels=config.get_json_param(json_cfg_tree,'autojoin_channels')
-	if(autojoin_channels!=None):
+	if(json_autojoin_channels!=None):
 		autojoin_channels=json_autojoin_channels
 	
+	#debug channels to join and spam
 	json_dbg_channels=config.get_json_param(json_cfg_tree,'dbg_channels')
-	if(dbg_channels!=None):
+	if(json_dbg_channels!=None):
 		dbg_channels=json_dbg_channels
 	
+	#server connection information (host, port, encryption)
 	json_host=config.get_json_param(json_cfg_tree,'host')
-	if(host!=None):
+	if(json_host!=None):
 		host=json_host
 	json_port=config.get_json_param(json_cfg_tree,'port')
-	if(port!=None):
+	if(json_port!=None):
 		port=json_port
 	json_use_ssl=config.get_json_param(json_cfg_tree,'use_ssl')
-	if(use_ssl!=None):
+	if(json_use_ssl!=None):
 		use_ssl=json_use_ssl
 	
-	json_authed_users=config.get_json_param(json_cfg_tree,'authed_users')
-	if(authed_users!=None):
-		authed_users=json_authed_users
+	#anti-spam settings (prevent generating commands to other bots, etc.)
+	json_gen_cmd=config.get_json_param(json_cfg_tree,'gen_cmd')
+	if(json_gen_cmd!=None):
+		gen_cmd=json_gen_cmd
 	
+	#specially-handled user lists
+	json_authed_users=config.get_json_param(json_cfg_tree,'authed_users')
+	if(json_authed_users!=None):
+		authed_users=json_authed_users
 	json_ignored_users=config.get_json_param(json_cfg_tree,'ignored_users')
-	if(ignored_users!=None):
+	if(json_ignored_users!=None):
 		ignored_users=json_ignored_users
 	
 	#IRC-related configuration done

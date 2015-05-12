@@ -3,6 +3,7 @@
 	"host":"ssl.irc.atw-inter.net",
 	"port":6697,
 	"use_ssl":true,
+	"gen_cmd":false,
 	"autojoin_channels":[
 		"#imgurians",
 		"#imgurians-tech"
