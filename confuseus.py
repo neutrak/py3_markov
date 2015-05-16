@@ -686,7 +686,7 @@ def main(state_file,use_ssl=True):
 		bot_nick=sys.argv[1]
 	print('Bot Nick is '+bot_nick)
 	
-	print('Creating connection to '+host+' on port '+str(port)+'...')
+	print('Creating '+('encrypted' if use_ssl else 'UNENCRYPTED')+' connection to '+host+' on port '+str(port)+'...')
 	
 	#tcp client socket
 	sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)

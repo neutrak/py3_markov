@@ -1,8 +1,8 @@
 {
 	"bot_nick":"confuseus",
-	"host":"ssl.irc.atw-inter.net",
-	"port":6697,
-	"use_ssl":true,
+	"host":"open.ircnet.org",
+	"port":6667,
+	"use_ssl":false,
 	"gen_cmd":false,
 	"autojoin_channels":[
 		"#imgurians",
