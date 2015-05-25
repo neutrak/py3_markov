@@ -253,7 +253,7 @@ def handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 			response=http_cat.get_page(url)
 		except:
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)',1)
-			return (True,dbg_str)
+			return
 		
 		response_type=response[0].split("\n")[0].rstrip("\r")
 		if(response_type.find('200 OK')<0):
@@ -263,7 +263,7 @@ def handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 				json_tree=json.loads(response[1])
 			except ValueError:
 				py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb',1)
-				return (True,dbg_str)
+				return
 			
 			#movie information now that retrieval is done
 			title=config.get_json_param(json_tree,'Title')
@@ -483,7 +483,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(cmd==(cmd_esc+'source')):
 		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
-	elif(cmd==(cmd_esc+'omdb')):
+	elif((cmd==(cmd_esc+'omdb')) or (cmd==(cmd_esc+'imdb'))):
 		handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif((cmd==(cmd_esc+'splchk')) or (cmd==(cmd_esc+'spellcheck')) or (cmd==(cmd_esc+'sp')) or (cmd==(cmd_esc+'spell'))):
