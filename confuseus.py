@@ -347,6 +347,95 @@ def handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		
 		words_on_line+=1
 
+def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	arguments=line_post_cmd.split(' ')
+	if(len(arguments)<3):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Too few arguments given to '+cmd_esc+'timecalc command; Usage: '+cmd_esc+'timecalc <%R> <tz1> <tz2>',1)
+		return
+	
+	#parse out %R
+	#%R means <hours (0-23)>:<minutes (0-60)>
+	
+	#the time is valid until we're missing something we need or an exception is thrown
+	valid_time=True
+	time_str=arguments[0]
+	time_list=time_str.split(':')
+	
+	#note that we use < instead of != because if seconds are given that's okay we just ignore them
+	if(len(time_list)<2):
+		valid_time=False
+	
+	hours=0
+	minutes=0
+	try:
+		hours=int(time_list[0])
+		minutes=int(time_list[1])
+	except ValueError:
+		valid_time=False
+	
+	#note that leap seconds can cause a valid 23:60 time, but we don't consider that
+	if(hours<0 or hours>=24 or minutes<0 or minutes>=60):
+		valid_time=False
+	
+	if(not valid_time):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Invalid time given; syntax is <hours>:<minutes> where 0<=hours<=23, 0<=minutes<=59',1)
+		return
+	
+	#save off the given time so we can manipulate the hours and minutes to calculate for the second timezone
+	#this is what the time is in the first timezone
+	given_hours=hours
+	given_minutes=minutes
+	
+	#now get the timezones from the remaining arguments
+	#(which we know exist because we did a check earlier)
+	tz_1_str=arguments[1]
+	tz_2_str=arguments[2]
+	
+	#these are utc offsets
+	tz_1=0
+	tz_2=0
+	
+	try:
+		tz_1=int(tz_1_str)
+		tz_2=int(tz_2_str)
+	except ValueError:
+		#note we re-use the valid_time variable here
+		#in order to save memory, and since if it was previously false we would have already returned
+		valid_time=False
+	
+	if(not valid_time):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Invalid timezone(s) given; should be an integer value representing UTC offset',1)
+		return
+	
+	#if we got here then we have a valid time, and 2 valid timezones
+	#time to do the real calculation!
+	tz_diff=(tz_2-tz_1)
+	hours+=tz_diff
+	
+	#calculate carry (for when someone is a day different due to clock rollover)
+	day_diff=0
+	if(hours>23):
+		hours-=24
+		day_diff=1
+	elif(hours<0):
+		hours+=24
+		day_diff=-1
+	
+	#pretty formatting by prepending 0s when numbers are <10
+	given_hours_str=str(given_hours)
+	if(len(given_hours_str)<2):
+		given_hours_str='0'+given_hours_str
+	given_minutes_str=str(given_minutes)
+	if(len(given_minutes_str)<2):
+		given_minutes_str='0'+given_minutes_str
+	hours_str=str(hours)
+	if(len(hours_str)<2):
+		hours_str='0'+hours_str
+	minutes_str=str(minutes)
+	if(len(minutes_str)<2):
+		minutes_str='0'+minutes_str
+	
+	py3queueln(sock,'PRIVMSG '+channel+' :'+given_hours_str+':'+given_minutes_str+' at UTC '+tz_1_str+' is '+hours_str+':'+minutes_str+(' the next day' if day_diff>0 else (' the previous day' if day_diff<0 else ''))+' at UTC '+tz_2_str,1)
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
@@ -385,6 +474,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]           -> generates random number in range [1,sides]',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]      -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2> -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
 			for conversion in unit_conv_list:
 				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
 				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
@@ -504,6 +595,19 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		value=random.randint(1,sides)
 		py3queueln(sock,'PRIVMSG '+channel+' :Rolled a '+str(value)+' with a d'+str(sides),1)
 		
+		handled=True
+	elif(cmd==(cmd_esc+'time')):
+		tz=0
+		if(line_post_cmd!=''):
+			try:
+				tz=int(line_post_cmd)
+			except ValueError:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: '+line_post_cmd+' is not a valid UTC-offset timezone; will give UTC time instead...',1)
+		current_time=time.asctime(time.gmtime(time.time()+(tz*60*60)))
+		py3queueln(sock,'PRIVMSG '+channel+' :Current time is '+current_time+' (UTC '+('+'+str(tz) if tz>=0 else str(tz))+')')
+		handled=True
+	elif(cmd==(cmd_esc+'timecalc')):
+		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		if(is_pm):
