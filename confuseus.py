@@ -149,7 +149,7 @@ unit_conv_list.append(unit_conv('force->mass','lb','pounds under earth-surface g
 
 #unit conversion miles to kilometers
 def mi_to_km(mi):
-	return mi*1.609334
+	return mi*1.609344
 
 unit_conv_list.append(unit_conv('length','mi','miles','km','kilometers',mi_to_km))
 
