@@ -229,6 +229,12 @@ def dbg_output(sock,dbg_str):
 def round_nstr(num):
 	return ('%10.5f' % num).lstrip(' ')
 
+#do substitutions which people expect from IRC but are really client-side
+def irc_str_map(line_post_cmd):
+	if(line_post_cmd.startswith('/me')):
+		line_post_cmd='\x01ACTION'+line_post_cmd[len('/me'):]
+	return line_post_cmd
+
 #handle conversions (stored in a generic unit_conv list)
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	global unit_conv_list
@@ -448,7 +454,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
 		output=''
 		if(line_post_cmd!=''):
-			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
+			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
@@ -684,7 +690,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
-		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,line_post_cmd,random.randint(0,1)+1,retries_left=3)
+		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3)
 		
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
