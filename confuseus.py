@@ -616,8 +616,32 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
-		if(is_pm):
-			py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
+		try:
+			#alternate conversion syntax
+			#check if the "command" is a valid floating point number
+			conv_arg=float(cmd[len(cmd_esc):])
+			
+			#the line after the "command" is the command checked against the conversion list
+			#some arguments here are a little weird because they're being transposed
+			found_conversion=False
+			for conversion in unit_conv_list:
+				#we found the requested conversion, so do the thing and output the result
+				#note that "X to Y" gets translated here as "X->Y"
+				if(conversion.chk_cmd(cmd_esc,cmd_esc+line_post_cmd.replace(' to ','->'))):
+					conversion.output_conv(sock,channel,conv_arg)
+					found_conversion=True
+			
+			#this was a valid number, but something went wrong during conversion
+			if(not found_conversion):
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: Conversion not found '+line_post_cmd,1)
+			
+			#in any case if we got a number don't handle this line any more
+			handled=True
+		#the "command" wasn't a valid floating point number,
+		#so output an error for PM, or just do nothing in a channel
+		except ValueError:
+			if(is_pm):
+				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
 		
 		#this prevents the bot from learning from unrecognized ! commands
 		#(which are usually meant for another bot)
