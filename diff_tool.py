@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import os
+
 #a quick difference calculation; this is based on the levenshtein distance
 #but is a faster implementation and stores more information
 def quick_diff(start_line,end_line):
@@ -41,7 +43,7 @@ def quick_diff(start_line,end_line):
 	
 	return (dist[len(start_line)][len(end_line)],dist)
 
-def get_dictionary(dict_paths=['/usr/dict/words','/usr/share/dict/words'],hard_fail=True):
+def get_dictionary(dict_paths=[os.getenv('HOME')+'/words.txt','/usr/dict/words','/usr/share/dict/words'],hard_fail=True):
 	import os
 	
 	path=''
