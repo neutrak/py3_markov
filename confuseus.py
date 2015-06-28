@@ -606,9 +606,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		tz=0
 		if(line_post_cmd!=''):
 			try:
-				tz=int(line_post_cmd)
+				tz=float(line_post_cmd)
 			except ValueError:
 				py3queueln(sock,'PRIVMSG '+channel+' :Err: '+line_post_cmd+' is not a valid UTC-offset timezone; will give UTC time instead...',1)
+		if(abs(tz)>24):
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: timezone offsets from utc cannot be outside the range [-24,24] because that makes no sense; giving UTC time...')
+			tz=0
 		current_time=time.asctime(time.gmtime(time.time()+(tz*60*60)))
 		py3queueln(sock,'PRIVMSG '+channel+' :Current time is '+current_time+' (UTC '+('+'+str(tz) if tz>=0 else str(tz))+')')
 		handled=True
