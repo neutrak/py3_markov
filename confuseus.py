@@ -522,13 +522,16 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel)):
 		handled=True
 	elif(cmd==(cmd_esc+'calc')):
-		err_msgs,result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
-		if(len(result)==1):
-			py3queueln(sock,'PRIVMSG '+channel+' :'+str(result[0]),1)
-		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
-			for err_idx in range(0,len(err_msgs)):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
+		try:
+			err_msgs,result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
+			if(len(result)==1):
+				py3queueln(sock,'PRIVMSG '+channel+' :'+str(result[0]),1)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
+				for err_idx in range(0,len(err_msgs)):
+					py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
+		except ValueError:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (ValueError)',1)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#disabled because we have another bot to do this now
