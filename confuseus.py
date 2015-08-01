@@ -533,6 +533,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		#TODO: figure out why divide-by-0 is triggering a ValueError here, it should be handled elsewhere
 		except ValueError:
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (ValueError) (divide by zero?)',1)
+		except IndexError:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (IndexError) (mismatched parens?)',1)
+		except:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception in rpn parsing; tell neutrak the command you used to get this and he\'ll look into it',1)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#disabled because we have another bot to do this now

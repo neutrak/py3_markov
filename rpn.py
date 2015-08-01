@@ -284,10 +284,10 @@ def rpn_eval(rpn_exp,verbose=False):
 					tmp=float(stack[i-2])*float(stack[i-1])
 				#division
 				elif(stack[i]=='/'):
-					if(float(stack[i-1])==0.0):
-						if(verbose):
-							print('Error: Could not divide by 0, returning stack')
-						return stack
+#					if(float(stack[i-1])==0.0):
+#						if(verbose):
+#							print('Error: Could not divide by 0, returning stack')
+#						return stack
 					tmp=float(stack[i-2])/float(stack[i-1])
 				#modulo
 				elif(stack[i]=='%'):
