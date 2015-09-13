@@ -35,9 +35,11 @@ def separate_http_header(http_response):
 def get_page(url,port=80):
 	#strip off the protocol (we assume http or https)
 	protocol_idx=url.find('://')
+	protocol_str='http'
 	if(protocol_idx>=0):
-		print('Protocol: '+url[0:protocol_idx])
+		protocol_str=url[0:protocol_idx].lower()
 		url=url[protocol_idx+len('://'):len(url)]
+	print('Protocol: '+protocol_str)
 	
 	path_idx=url.find('/')
 	if(path_idx<0):
@@ -68,6 +70,10 @@ def get_page(url,port=80):
 	
 	s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.settimeout(3.0)
+	if(protocol_str=='https'):
+		import ssl
+		s=ssl.wrap_socket(s,cert_reqs=ssl.CERT_NONE) #NOTE: cert checking is not done here
+#		s=ssl.wrap_socket(s,cert_reqs=ssl.CERT_NONE,do_handshake_on_connect=True,ssl_version=ssl.PROTOCOL_TLSv1_2) #NOTE: cert checking is not done here
 	s.connect((domain,port))
 	py3send(s,http_rqst)
 	

@@ -475,7 +475,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-#			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
@@ -540,13 +540,15 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		#disabled because we have another bot to do this now
-		return (True,dbg_str)
+#		return (True,dbg_str)
 		
 		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
 		try:
 			wiki_title=line_post_cmd.replace(' ','_')
 			wiki_url='https://en.wikipedia.org/wiki/'+wiki_title
-			response=http_cat.get_page(wiki_url)
+#			response=http_cat.get_page(wiki_url)
+			#HTTPS generally uses port 443, rather than port 80
+			response=http_cat.get_page(wiki_url,443)
 			
 			response_type=response[0].split("\n")[0].rstrip("\r")
 			
