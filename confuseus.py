@@ -25,6 +25,7 @@ except ImportError:
 	db_login=None
 
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
+MAX_IRC_LINE_LEN=512
 
 #NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users
 #are specified by the json config file; these are just defaults if values are not configured there
@@ -544,8 +545,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		
 		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
 		try:
-			wiki_title=line_post_cmd.replace(' ','_')
-			wiki_url='https://en.wikipedia.org/wiki/'+wiki_title
+			wiki_search=line_post_cmd.replace(' ','%20')
+			wiki_url='https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search='+wiki_search+'&limit=2&namespace=0'
 #			response=http_cat.get_page(wiki_url)
 			#HTTPS generally uses port 443, rather than port 80
 			response=http_cat.get_page(wiki_url,443)
@@ -568,22 +569,30 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 				if(wiki_text==''):
 					py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text',1)
 				else:
-					#get the first paragraph and throw out nested html tags
-					wiki_text=http_cat.html_parse_first(wiki_text,'<p>','</p>')
-					max_p_len=768
-					wiki_text=wiki_text[0:max_p_len]
-					line_len=300
-					while(wiki_text!=''):
-						line_delimiter='. '
-						prd_idx=wiki_text.find(line_delimiter)
-						if(prd_idx>=0):
-							prd_idx+=len(line_delimiter)
-							py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:prd_idx],1)
-							wiki_text=wiki_text[prd_idx:]
+					print(wiki_text) #debug
+					
+					#parse JSON and output the juicy bits
+					wiki_json=json.loads(wiki_text)
+					
+					#disambiguate?
+					valid_output=True
+					if(len(wiki_json[1])>1):
+						for n in range(0,len(wiki_json[1])):
+							if(wiki_json[1][n].lower()==line_post_cmd.lower()):
+								break
 						else:
-							py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_text[0:line_len],1)
-							wiki_text=wiki_text[line_len:]
-				py3queueln(sock,'PRIVMSG '+channel+' :'+wiki_url,1) #link the wiki page itself?
+							py3queueln(sock,'PRIVMSG '+channel+' :Please disambiguate; you may want one of the following: '+', '.join(wiki_json[1]))
+							valid_output=False
+					
+					if(valid_output):
+						output_text=' '.join(wiki_json[2])
+						reserved_len=len('PRIVMSG '+channel+' :...'+"\n")
+						if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
+							output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
+						py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
+						
+						#link the wiki page itself?
+						py3queueln(sock,'PRIVMSG '+channel+' :'+' '.join(wiki_json[3]),1)
 		except:
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
 		handled=True

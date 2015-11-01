@@ -26,7 +26,7 @@ def log_line(line,log_file='log.txt'):
 #s is the socket
 def py3send(s,message):
 	try:
-		s.send(message.encode('latin-1'))
+		s.send(message.encode('latin-1','replace'))
 	except UnicodeEncodeError:
 		print('Err: Unicode to latin-1 conversion error, ignoring message '+str(message))
 
