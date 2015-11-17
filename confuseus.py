@@ -25,7 +25,7 @@ except ImportError:
 	db_login=None
 
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
-MAX_IRC_LINE_LEN=512
+MAX_IRC_LINE_LEN=(512)
 
 #NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users
 #are specified by the json config file; these are just defaults if values are not configured there
@@ -586,7 +586,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 					
 					if(valid_output):
 						output_text=' '.join(wiki_json[2])
-						reserved_len=len('PRIVMSG '+channel+' :...'+"\n")
+						reserved_len=len('PRIVMSG '+channel+' :...'+"\r\n")
 						if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
 							output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
 						py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
