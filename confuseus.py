@@ -459,6 +459,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
+		#properly close CTCP when it's generated
+		if(output.startswith('\x01ACTION') and (not output.endswith('\x01'))):
+			output+='\x01'
+		
 		#prevent generating commands directed towards other bots,
 		#if configured to do that
 		if(not gen_cmd):
@@ -742,6 +746,10 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#then just go random (fall back functionality)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
+		
+		#properly close CTCP when it's generated
+		if(output.startswith('\x01ACTION') and (not output.endswith('\x01'))):
+			output+='\x01'
 		
 		#prevent generating commands directed towards other bots,
 		#if configured to do that
