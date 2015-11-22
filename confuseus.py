@@ -444,6 +444,65 @@ def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	
 	py3queueln(sock,'PRIVMSG '+channel+' :'+given_hours_str+':'+given_minutes_str+' at UTC '+tz_1_str+' is '+hours_str+':'+minutes_str+(' the next day' if day_diff>0 else (' the previous day' if day_diff<0 else ''))+' at UTC '+tz_2_str,1)
 
+def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
+	try:
+		wiki_search=line_post_cmd.replace(' ','%20')
+		wiki_url='https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search='+wiki_search+'&limit=2&namespace=0'
+#			response=http_cat.get_page(wiki_url)
+		#HTTPS generally uses port 443, rather than port 80
+		response=http_cat.get_page(wiki_url,443)
+		
+		response_type=response[0].split("\n")[0].rstrip("\r")
+		
+		#if we get a 301 moved and the page requested was lower case then
+		#before giving up try it as upper-case
+		if((response_type.find('301 Moved')>=0) and (line_post_cmd[0]==line_post_cmd[0].lower())):
+			return handle_bot_cmd(sock,cmd_esc,
+				cmd,
+				(line_post_cmd[0].upper())+(line_post_cmd[1:]),
+				channel,
+				nick,is_pm,state_change,use_pg,db_login)
+		
+		if(response_type.find('200 OK')<0):
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
+		else:
+			wiki_text=response[1]
+			if(wiki_text==''):
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text',1)
+			else:
+				print(wiki_text) #debug
+				
+				#parse JSON and output the juicy bits
+				wiki_json=json.loads(wiki_text)
+				
+				#disambiguate?
+				valid_output=True
+				if(len(wiki_json[1])>1):
+					for n in range(0,len(wiki_json[1])):
+						if(wiki_json[1][n].lower()==line_post_cmd.lower()):
+							break
+					else:
+						py3queueln(sock,'PRIVMSG '+channel+' :Please disambiguate; you may want one of the following: '+', '.join(wiki_json[1]))
+						valid_output=False
+				
+				if(len(wiki_json[3])==0):
+					py3queueln(sock,'PRIVMSG '+channel+' :Err: No wikipedia pages found for \"'+line_post_cmd+'\"')
+					valid_output=False
+				
+				if(valid_output):
+					output_text=' '.join(wiki_json[2])
+					reserved_len=len('PRIVMSG '+channel+' :...'+"\r\n")
+					if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
+						output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
+					py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
+					
+					#link the wiki page itself?
+					py3queueln(sock,'PRIVMSG '+channel+' :'+' '.join(wiki_json[3]),1)
+	except:
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
+
+
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
 	global unit_conv_list
@@ -535,7 +594,6 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 				py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
 				for err_idx in range(0,len(err_msgs)):
 					py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
-		#TODO: figure out why divide-by-0 is triggering a ValueError here, it should be handled elsewhere
 		except ValueError:
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (ValueError) (divide by zero?)',1)
 		except IndexError:
@@ -544,62 +602,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception in rpn parsing; tell neutrak the command you used to get this and he\'ll look into it',1)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
-		#disabled because we have another bot to do this now
-#		return (True,dbg_str)
-		
-		#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
-		try:
-			wiki_search=line_post_cmd.replace(' ','%20')
-			wiki_url='https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search='+wiki_search+'&limit=2&namespace=0'
-#			response=http_cat.get_page(wiki_url)
-			#HTTPS generally uses port 443, rather than port 80
-			response=http_cat.get_page(wiki_url,443)
-			
-			response_type=response[0].split("\n")[0].rstrip("\r")
-			
-			#if we get a 301 moved and the page requested was lower case then
-			#before giving up try it as upper-case
-			if((response_type.find('301 Moved')>=0) and (line_post_cmd[0]==line_post_cmd[0].lower())):
-				return handle_bot_cmd(sock,cmd_esc,
-					cmd,
-					(line_post_cmd[0].upper())+(line_post_cmd[1:]),
-					channel,
-					nick,is_pm,state_change,use_pg,db_login)
-			
-			if(response_type.find('200 OK')<0):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
-			else:
-				wiki_text=response[1]
-				if(wiki_text==''):
-					py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text',1)
-				else:
-					print(wiki_text) #debug
-					
-					#parse JSON and output the juicy bits
-					wiki_json=json.loads(wiki_text)
-					
-					#disambiguate?
-					valid_output=True
-					if(len(wiki_json[1])>1):
-						for n in range(0,len(wiki_json[1])):
-							if(wiki_json[1][n].lower()==line_post_cmd.lower()):
-								break
-						else:
-							py3queueln(sock,'PRIVMSG '+channel+' :Please disambiguate; you may want one of the following: '+', '.join(wiki_json[1]))
-							valid_output=False
-					
-					if(valid_output):
-						output_text=' '.join(wiki_json[2])
-						reserved_len=len('PRIVMSG '+channel+' :...'+"\r\n")
-						if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
-							output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
-						py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
-						
-						#link the wiki page itself?
-						py3queueln(sock,'PRIVMSG '+channel+' :'+' '.join(wiki_json[3]),1)
-		except:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
+		handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
+	#TODO: add wiktionary or some other dictionary with definitions if at all reasonable to do
 	elif(cmd==(cmd_esc+'source')):
 		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
