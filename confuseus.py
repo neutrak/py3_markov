@@ -502,6 +502,63 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	except:
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
 
+def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	#what's the word, dawg?
+	word=line_post_cmd.split(' ')[0]
+	
+	print('[dbg] looking up definition for '+word)
+	
+	if(not word[0].isalpha()):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: words must start with alphabetical characters',1)
+		return
+	
+	#look at the dictionary file for words starting with the given first letter
+	dict_file='gcide-0.51/CIDE.'+(word[0].upper())
+	try:
+		fp=open(dict_file,'r')
+#		fcontent=fp.read().encode('latin-1','replace')
+#		fcontent=fp.read().encode('ascii','replace')
+		fcontent=fp.read()
+		fp.close()
+	except IOError:
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: dictionary file not found; tell the bot owner to download gcide-0.51 to enable this function',1)
+		return
+	except UnicodeDecodeError:
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: UnicodeDecodeError; your guess is as good as mine, dude')
+		return
+	
+	defs=[]
+	
+	#for each entry, check if it's the word we want
+	found_word=False
+	for line in fcontent.split('\n'):
+		#if we found the <ent> for the word, then look for <def>s
+		if(found_word):
+			#if we found the word but we hit the end of the definition block then we're all done
+			if(line==''):
+				break
+			
+			#if we found the word and a definition for it, output that!
+			def_start_idx=line.find('<def>')
+			if(def_start_idx>=0):
+				def_end_idx=line.find('</def>')
+				defs.append(line[def_start_idx+len('<def>'):def_end_idx])
+		#if we haven't yet found the word, but this entry might have it
+		#then check!
+		elif(line.startswith('<p><ent>')):
+#			print('[dbg] Got word entry line '+line)
+			ent_word=line[len('<p><ent>'):line.find('</ent>')]
+			print('[dbg] ent_word is '+ent_word)
+			if(ent_word==word):
+				found_word=True
+		
+	if(len(defs)>0):
+		n=0
+		for definition in defs:
+			py3queueln(sock,'PRIVMSG '+channel+' :('+str(n)+') '+definition,1)
+			n+=1
+	else:
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: no definitions found in dictionary for \''+word+'\'')
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
@@ -539,7 +596,8 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> [EXPERIMENTAL] grabs first paragraph from wikipedia',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> grabs topic summary from wikipedia',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>             -> checks definintion of word in gcide dictionary',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
@@ -603,6 +661,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
+		handled=True
+	elif(cmd==(cmd_esc+'define')):
+		handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	#TODO: add wiktionary or some other dictionary with definitions if at all reasonable to do
 	elif(cmd==(cmd_esc+'source')):
