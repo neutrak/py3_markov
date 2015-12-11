@@ -14,6 +14,7 @@ import ssl
 import json
 import errno
 import select
+import os
 
 #for the database backend which significantly reduces RAM use
 use_pg=False
@@ -225,6 +226,76 @@ def dbg_output(sock,dbg_str):
 			if(line!=''):
 				py3queueln(sock,'PRIVMSG '+chan+' :'+line,4)
 #				time.sleep(random.uniform(0.1,1.5))
+
+#this gets the definition of a word out of the given dictionary
+def def_word(word,dict_root=os.path.join(os.environ['HOME'],'documents','gcide-0.51')):
+	print('Looking up definitions for \''+word+'\'...')
+	
+	first_char=word[0]
+	if(not first_char.isalpha()):
+		return (False,'Err: word must start with alphabetical character')
+	
+	#get the correct dictionary file and slurp it in
+	sub_dict_path=os.path.join(dict_root,'CIDE.'+first_char.upper())
+	try:
+		fp=open(sub_dict_path,'rb')
+		fcontent=fp.read().decode('latin-1')
+		fp.close()
+	except IOError:
+		return (False,'Err: could not read dictionary file; is gcide-0.51 installed?')
+	except UnicodeDecodeError:
+		return (False,'Err: UnicodeDecodeError; your guess is as good as mine, dude')
+	
+	#check each word in the dictionary file for words which start with this letter
+	#as we find entry blocks for this word, add them to the list for further parsing
+	definitions=[]
+	found_word=False
+	entry_blocks=[]
+	for line in fcontent.split("\n"):
+		#if we found the word then just continue to get the whole block
+		if(found_word):
+			if(line==''):
+				#this supports multiple entry blocks for the same word
+				#(a break would only support one block, and hence one definition)
+				found_word=False
+			entry_blocks[len(entry_blocks)-1]+="\n"+line
+		#check each entry for the word we're trying to define
+		elif(line.startswith('<p><ent>')):
+			ent_word=line[len('<p><ent>'):line.find('</ent>')]
+			#if we found a definition for this word, then store the block
+			#note this is case-sensitive
+			if(ent_word==word):
+				found_word=True
+				print('Dbg: found word '+ent_word)
+				entry_blocks.append(line)
+	
+	print('')
+	
+	#for each entry block, strip out the definition and anything else we may want
+	#and discard the rest
+	for entry_block in entry_blocks:
+		entry_block=entry_block.strip("\n")
+		entry_block=entry_block.replace('<br/','')
+		print(entry_block+"\n")
+		
+		try:
+			def_entry=entry_block[entry_block.find('<def>'):entry_block.find('</def>')]
+		except:
+			continue
+		def_entries=[http_cat.html_strip_tags(def_entry)]
+		
+		#TODO: support parts of speech, other information about this word
+		
+		definitions+=def_entries
+	
+	#if no definitions were found, try again with an upper-case first letter,
+	#or, if the first letter was already upper-case, return error
+	if(len(definitions)==0):
+		if(first_char==first_char.lower()):
+			return def_word(first_char.upper()+word[1:],dict_root)
+		return (False,'Err: no definition found')
+	#one or more definitions was found, return success and the definitions
+	return (True,definitions)
 
 #round so numbers look nice on IRC
 def round_nstr(num):
@@ -494,7 +565,8 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 					output_text=' '.join(wiki_json[2])
 					reserved_len=len('PRIVMSG '+channel+' :...'+"\r\n")
 					if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
-						output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
+#						output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
+						output_text=output_text[0:MAX_IRC_LINE_LEN]+'...'
 					py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
 					
 					#link the wiki page itself?
@@ -504,61 +576,24 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 
 def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	#what's the word, dawg?
-	word=line_post_cmd.split(' ')[0]
+	word=line_post_cmd
 	
-	print('[dbg] looking up definition for '+word)
+	#get all the definitions of the word from the local dictionary
+	success,definitions=def_word(word)
 	
-	if(not word[0].isalpha()):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: words must start with alphabetical characters',1)
-		return
-	
-	#look at the dictionary file for words starting with the given first letter
-	dict_file='gcide-0.51/CIDE.'+(word[0].upper())
-	try:
-		fp=open(dict_file,'r')
-#		fcontent=fp.read().encode('latin-1','replace')
-#		fcontent=fp.read().encode('ascii','replace')
-		fcontent=fp.read()
-		fp.close()
-	except IOError:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: dictionary file not found; tell the bot owner to download gcide-0.51 to enable this function',1)
-		return
-	except UnicodeDecodeError:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: UnicodeDecodeError; your guess is as good as mine, dude')
-		return
-	
-	defs=[]
-	
-	#for each entry, check if it's the word we want
-	found_word=False
-	for line in fcontent.split('\n'):
-		#if we found the <ent> for the word, then look for <def>s
-		if(found_word):
-			#if we found the word but we hit the end of the definition block then we're all done
-			if(line==''):
-				break
-			
-			#if we found the word and a definition for it, output that!
-			def_start_idx=line.find('<def>')
-			if(def_start_idx>=0):
-				def_end_idx=line.find('</def>')
-				defs.append(line[def_start_idx+len('<def>'):def_end_idx])
-		#if we haven't yet found the word, but this entry might have it
-		#then check!
-		elif(line.startswith('<p><ent>')):
-#			print('[dbg] Got word entry line '+line)
-			ent_word=line[len('<p><ent>'):line.find('</ent>')]
-			print('[dbg] ent_word is '+ent_word)
-			if(ent_word==word):
-				found_word=True
+	#if definitions were found, then output those
+	if(success):
+		def_line=word+': '
+		for i in range(0,len(definitions)):
+			if(i!=0):
+				def_line+=' | '
+			def_line+='('+str(i)+') '+definitions[i]
 		
-	if(len(defs)>0):
-		n=0
-		for definition in defs:
-			py3queueln(sock,'PRIVMSG '+channel+' :('+str(n)+') '+definition,1)
-			n+=1
+		py3queueln(sock,'PRIVMSG '+channel+' :'+def_line[0:MAX_IRC_LINE_LEN])
+	#no definitions found; output the error message
 	else:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: no definitions found in dictionary for \''+word+'\'')
+		err_msg=definitions
+		py3queueln(sock,'PRIVMSG '+channel+' :'+err_msg)
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
