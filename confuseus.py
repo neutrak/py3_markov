@@ -688,9 +688,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			if(len(dbg_hist)>0):
 #				py3queueln(sock,'PRIVMSG '+channel+' :'+dbg_hist[len(dbg_hist)-1-hist_ofst],2)
 				line=dbg_hist[len(dbg_hist)-1-hist_ofst]
-				py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-40],2)
+				py3queueln(sock,'PRIVMSG '+channel+' :'+line[0:MAX_IRC_LINE_LEN-40],2)
 				if(len(line[MAX_IRC_LINE_LEN-40:])>0):
-					py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-40:],2)
+					py3queueln(sock,'PRIVMSG '+channel+' :'+line[MAX_IRC_LINE_LEN-40:],2)
 			else:
 				py3queueln(sock,'PRIVMSG '+channel+' :Err: No debug history exists',1)
 		else:
@@ -928,7 +928,8 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 			if(output.startswith('!')):
 				output='\\'+output
 		
-		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
+#		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
+		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
 		
 		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 		
