@@ -404,7 +404,8 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	if(verbose_dbg):
 		print('markov.generate debug 0, got '+str(len(transition_states))+' transition states for prefix '+str(prefix))
-		dbg_str+='[dbg] got '+str(len(transition_states))+' transition states for prefix '+str(prefix)+"\n"
+#		dbg_str+='[dbg] got '+str(len(transition_states))+' transition states for prefix '+str(prefix)+"\n"
+		dbg_str+=str(prefix)+'-['+str(len(transition_states))+']->'
 	
 	#the states which indicate transitions starting from the given suffix
 	#(1st word of accumulator)
@@ -429,7 +430,8 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	
 	if(verbose_dbg and back_gen):
 		print('markov.generate debug 1, got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix))
-		dbg_str+='[dbg] got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix)+"\n"
+#		dbg_str+='[dbg] got '+str(len(back_transition_states))+' transition states for suffix '+str(back_suffix)+"\n"
+		dbg_str+='<-['+str(len(back_transition_states))+']-'+str(back_suffix)
 	
 	if(back_gen and (len(back_transition_states)>0)):
 		back_state_idx=random.randint(0,len(back_transition_states)-1)

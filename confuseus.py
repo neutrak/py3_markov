@@ -28,6 +28,13 @@ except ImportError:
 SOURCE_CODE_URL='https://github.com/neutrak/py3_markov'
 MAX_IRC_LINE_LEN=(512)
 
+#debug state; can be always or never (might get expanded later)
+dbg_state='always'
+#debug history, how many previously generated debug messages are availabe
+dbg_hist=[]
+#a max, after which to rotate debug history
+dbg_hist_max=3
+
 #NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users
 #are specified by the json config file; these are just defaults if values are not configured there
 
@@ -221,11 +228,30 @@ def learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_c
 	return (lines_since_write,lines_since_sort_chk)
 
 def dbg_output(sock,dbg_str):
-	for chan in dbg_channels:
-		for line in dbg_str.split("\n"):
-			if(line!=''):
-				py3queueln(sock,'PRIVMSG '+chan+' :'+line,4)
-#				time.sleep(random.uniform(0.1,1.5))
+	global dbg_channels
+	global dbg_state
+	global dbg_hist
+	global dbg_hist_max
+	
+	if(dbg_str!=''):
+		#handle debug string history so users can ask later
+		if(len(dbg_hist)>=dbg_hist_max):
+			#if we've hit max history, then shift and push out the oldest element
+			#note this is sorted from oldest to newest
+			dbg_hist=dbg_hist[1:]
+#			del(dbg_hist[0])
+		#put the new element at the end
+		dbg_hist.append(dbg_str)
+	
+	#if set to, then output to debug channels
+	if(dbg_state=='always'):
+		for chan in dbg_channels:
+			for line in dbg_str.split("\n"):
+				if(line!=''):
+					py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-40],4)
+					if(len(line[MAX_IRC_LINE_LEN-40:])>0):
+						py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-40:],4)
+#					time.sleep(random.uniform(0.1,1.5))
 
 #this gets the definition of a word out of the given dictionary
 def def_word(word,dict_root=os.path.join(os.environ['HOME'],'documents','gcide-0.51')):
@@ -598,6 +624,10 @@ def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
 	global unit_conv_list
+	global dbg_channels
+	global dbg_state
+	global dbg_hist
+	global dbg_hist_max
 	handled=False
 	
 	dbg_str=''
@@ -621,12 +651,56 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 				output='\\'+output
 		
 		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
-		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
+#		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
+		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
+		handled=True
+	elif(cmd==(cmd_esc+'dbg') or cmd==(cmd_esc+'debug')):
+		#set debug channel ON if authorized
+		if(line_post_cmd=='always'):
+			if(nick in authed_users):
+				dbg_state='always'
+				py3queueln(sock,'PRIVMSG '+channel+' :Info: Now outputting debug messages in '+(','.join(dbg_channels))+' without being asked',1)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: You are not authorized to change debug settings',1)
+		#set debug channel OFF if authorized
+		elif(line_post_cmd=='never'):
+			if(nick in authed_users):
+				dbg_state='never'
+				py3queueln(sock,'PRIVMSG '+channel+' :Info: No longer outputting debug messages without being asked',1)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: You are not authorized to change debug settings',1)
+		#no argument or an index means display some debug info from the history
+		elif(line_post_cmd.strip()=='' or line_post_cmd.isdigit()):
+			#print the entire debug history to the console a line at a time
+			for hist in dbg_hist:
+				print(hist)
+			
+			#digits are reverse indices into the debug history
+			hist_ofst=0
+			if(line_post_cmd.isdigit()):
+				hist_ofst=int(line_post_cmd)
+			#bounds checking for security and to prevent crashing
+			if(hist_ofst<0 or hist_ofst>=len(dbg_hist)):
+				hist_ofst=0
+				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid history offset; displaying last debug value',1)
+			
+			#if no argument is given then assume the user wanted the last debug message
+			if(len(dbg_hist)>0):
+#				py3queueln(sock,'PRIVMSG '+channel+' :'+dbg_hist[len(dbg_hist)-1-hist_ofst],2)
+				line=dbg_hist[len(dbg_hist)-1-hist_ofst]
+				py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-40],2)
+				if(len(line[MAX_IRC_LINE_LEN-40:])>0):
+					py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-40:],2)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: No debug history exists',1)
+		else:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument given to dbg, \''+line_post_cmd+'\'',1)
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
 		if(is_pm):
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>      -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
@@ -833,10 +907,6 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	dbg_str=''
 	
-	#at ente's request; allow users in "debug" channels to read the bot's mind
-#	net_dbg=False
-	net_dbg=True
-	
 	cmd_esc='!'
 	
 	#support question/answer style markov chain-ing stuff
@@ -885,9 +955,10 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		
 		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	
-	#if we're debugging over the network, then output to the debug channels
-	if(net_dbg):
-		dbg_output(sock,dbg_str)
+	#at ente's request; allow users in "debug" channels to read the bot's mind
+	#this may or may not output, depending on the dbg_state global, but it is always called
+	#because it stores a history for later output
+	dbg_output(sock,dbg_str)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	
