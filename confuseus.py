@@ -248,9 +248,9 @@ def dbg_output(sock,dbg_str):
 		for chan in dbg_channels:
 			for line in dbg_str.split("\n"):
 				if(line!=''):
-					py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-40],4)
-					if(len(line[MAX_IRC_LINE_LEN-40:])>0):
-						py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-40:],4)
+					py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-80],4)
+					if(len(line[MAX_IRC_LINE_LEN-80:])>0):
+						py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-80:],4)
 #					time.sleep(random.uniform(0.1,1.5))
 
 #this gets the definition of a word out of the given dictionary
@@ -688,9 +688,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			if(len(dbg_hist)>0):
 #				py3queueln(sock,'PRIVMSG '+channel+' :'+dbg_hist[len(dbg_hist)-1-hist_ofst],2)
 				line=dbg_hist[len(dbg_hist)-1-hist_ofst]
-				py3queueln(sock,'PRIVMSG '+channel+' :'+line[0:MAX_IRC_LINE_LEN-40],2)
-				if(len(line[MAX_IRC_LINE_LEN-40:])>0):
-					py3queueln(sock,'PRIVMSG '+channel+' :'+line[MAX_IRC_LINE_LEN-40:],2)
+				py3queueln(sock,'PRIVMSG '+channel+' :'+line[0:MAX_IRC_LINE_LEN-80],2)
+				if(len(line[MAX_IRC_LINE_LEN-80:])>0):
+					py3queueln(sock,'PRIVMSG '+channel+' :'+line[MAX_IRC_LINE_LEN-80:],2)
 			else:
 				py3queueln(sock,'PRIVMSG '+channel+' :Err: No debug history exists',1)
 		else:
