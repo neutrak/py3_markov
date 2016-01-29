@@ -621,6 +621,59 @@ def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		err_msg=definitions
 		py3queueln(sock,'PRIVMSG '+channel+' :'+err_msg)
 
+#display an example of the given command
+def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
+	if(line_post_cmd==''):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Missing argument (the command); see '+cmd_esc+'help for a command list',1)
+	elif(line_post_cmd==(cmd_esc+'wut')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'wut','',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'example')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example '+cmd_esc+'wut',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'example',cmd_esc+'wut',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'dbg')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'dbg','',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'shup')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup 4',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'shup','4',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'calc')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc 10*9^-3',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'calc','10*9^-3',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'wiki')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki wikipedia',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'wiki','wikipedia',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'define')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define dictionary',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'define','dictionary',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'omdb')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb Airplane!',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'omdb','Airplane!',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif((line_post_cmd==(cmd_esc+'splchk')) or (line_post_cmd==(cmd_esc+'sp')) or (line_post_cmd==(cmd_esc+'spellcheck'))):
+		#intentional misspelling to demonstrate spellcheck ability
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk misspeling',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'splchk','misspeling',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'dieroll')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll 6',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'dieroll','6',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'time')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time -6',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'time','-6',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'timecalc')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc 12:00 -6 +0',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'timecalc','12:00 -6 +0',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
+		py3queueln(sock,'PRIVMSG '+channel+' :Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
+	else:
+		for conversion in unit_conv_list:
+			conv_cmd=(cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr)
+			if(line_post_cmd==conv_cmd):
+				py3queueln(sock,'PRIVMSG '+channel+' :'+conv_cmd+' 1',1)
+				handle_bot_cmd(sock,cmd_esc,conv_cmd,'1',channel,nick,is_pm,state_change,use_pg,db_login)
+				break
+		else:
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument ('+line_post_cmd+'); see '+cmd_esc+'help for a command list',1)
+
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
 	global unit_conv_list
@@ -653,6 +706,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
 #		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
+		handled=True
+	elif(cmd==(cmd_esc+'example')):
+		handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login)
 		handled=True
 	elif(cmd==(cmd_esc+'dbg') or cmd==(cmd_esc+'debug')):
 		#set debug channel ON if authorized
@@ -700,6 +756,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		if(is_pm):
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
+			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>         -> display an example of a command and its output',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>      -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
 			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
@@ -719,7 +776,6 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 					help_str+=' '
 				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
 				py3queueln(sock,help_str,3)
-
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
 			
