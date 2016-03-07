@@ -1,13 +1,12 @@
 {
-	"bot_nick":"confuseus",
+	"bot_nick":"confuseus-dev",
 	"host":"ssl.irc.atw-inter.net",
 	"port":6697,
 	"use_ssl":true,
 	"gen_cmd":false,
 	"autojoin_channels":[
 		"#imgurians",
-		"#imgurians-tech",
-		"!immaturians"
+		"#imgurians-tech"
 		],
 	"dbg_channels":[
 		"+confuseus-dbg"
@@ -29,7 +28,23 @@
 	"pg_passwd":"sql",
 	"pg_dbname":"markovdb",
 	
-	"state_file":"state_file.txt"
+	"state_file":"state_file.txt",
 	
+	"answer_questions":true,
+	
+	"qa_sets":[
+		"why","because","?",
+		"why","Because","?",
+		"where","where","?",
+		"where","Where","?",
+		"who","he","?",
+		"who","He","?",
+		"who","she","?",
+		"who","She","?",
+		"who","the","?",
+		"who","The","?",
+		"how much","more than","?",
+		"how much","less than","?"
+		]
 }
 

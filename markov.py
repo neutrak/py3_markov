@@ -476,7 +476,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	return (acc.rstrip(' '),dbg_str)
 
 #generate from a given starting string
-def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,retries_left=0):
+def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,prefix_len=2,retries_left=0,qa_sets=[]):
 	output=''
 	dbg_str=''
 
@@ -489,14 +489,48 @@ def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,retries
 	#so it's disabled
 	back_gen=False
 	
-	#pick a random word the user said and start generating from there
+	#if a matching "question" line was found, try to generate an "answer" using the "prompt"
+	#and for bonus points, "quote" "stuff" VERY "unnecessarily" :P
+	qa_matches=[]
+	question=''
+	for n in range(0,len(qa_sets)):
+		#question-answer comes in sets of three
+		#bad-indexing ignores your last config gracefully
+		if((n%3==0) and ((n+2)<len(qa_sets))):
+			#if a question which was asked was found in the qa config
+			start_str_lower=start_str.lower()
+			qa_strt_def=qa_sets[n].lower()
+			qa_end_def=qa_sets[n+2].lower()
+			if((start_str_lower.startswith(qa_strt_def)) and (start_str_lower.endswith(qa_end_def))):
+				#output the appropriate response
+				question=qa_strt_def
+				qa_matches.append(qa_sets[n+1])
+				
+	
+	#if we know what to say because we have a prompt for this, then just do as we're told
+	#like good comrades
+	#TODO: ascii art hammer and sickle
+	if(len(qa_matches)>0):
+		rand_idx=random.randint(0,len(qa_matches)-1)
+		answer_prompt=qa_matches[rand_idx]
+		prefix_words=answer_prompt.split(' ')
+		while(len(prefix_words)<prefix_len):
+			prefix_words=['']+prefix_words
+		print('[dbg] Answering \"'+question+'\" using prompt \"'+str(prefix_words)+'\"')
+		
+		#start with what we're configured to start with, and go from there
+		output,dbg_str=generate(state_change,prefix=prefix_words,acc=' '.join(prefix_words),use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+		
+		if(output==''):
+			output,dbg_str=generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+		
+		return output,dbg_str
+	
+	#if no prompt was found (i.e. we got to this case)
+	#use a random word the user said and start generating from there
 	words=start_str.split(' ')
 	if(len(words)>0):
 		rand_word_idx=random.randint(0,len(words)-1)
-		
-		#all the existing state transitions have 2-word prefixes
-		#so that's the length we'll use
-		prefix_len=2
 		
 		prefix_words=[]
 		n=rand_word_idx
@@ -560,6 +594,9 @@ def read_state_change_from_file(filename):
 	except UnicodeDecodeError:
 		print('Err: could not decode fomr state_change file!!!!!; this is BAD')
 		return state_change
+#	except:
+#		print('Err: your shit\'s all fucked up')
+#		return state_change
 	
 	#each line in this file corresponds to a state,
 	#except for those starting with #, which are comments

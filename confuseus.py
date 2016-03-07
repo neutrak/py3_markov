@@ -47,6 +47,8 @@ host='ssl.irc.atw-inter.net'
 port=6697
 use_ssl=True
 gen_cmd=True
+answer_questions=False
+qa_sets=[]
 
 #users allowed to !shup the bot
 #(aka clear outgoing queue)
@@ -681,6 +683,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	global dbg_state
 	global dbg_hist
 	global dbg_hist_max
+	global qa_sets
 	handled=False
 	
 	dbg_str=''
@@ -689,7 +692,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
 		output=''
 		if(line_post_cmd!=''):
-			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3)
+			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets)
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
@@ -922,6 +925,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 
 def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global gen_cmd
+	global qa_sets
 	
 	#get some information (user, nick, host, etc.)
 	success,info,line=get_token(line,' ')
@@ -967,7 +971,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#support question/answer style markov chain-ing stuff
 	if(cmd.startswith(bot_nick)):
-		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3)
+		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets)
 		
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)
@@ -1239,6 +1243,23 @@ if(__name__=='__main__'):
 		ignored_users=json_ignored_users
 	
 	#IRC-related configuration done
+	
+	#get question-answer sets from the configuration file
+	#this feature is thanks to Mark (hey look I did it!)
+	#these will be used to generate better responses to pre-formatted discussion
+	json_answer_questions=config.get_json_param(json_cfg_tree,'answer_questions')
+	if(json_answer_questions!=None):
+		answer_questions=json_answer_questions
+	
+	#we allow disabling this function without requiring deleting all entries with the answer_questions bool
+	if(answer_questions):
+		json_qa_sets=config.get_json_param(json_cfg_tree,'qa_sets')
+		if(json_qa_sets!=None):
+			qa_sets=json_qa_sets
+	else:
+		qa_sets=[]
+		
+	
 	#get markov (database) configuration
 	
 	use_pg=config.get_json_param(json_cfg_tree,'use_pg')
