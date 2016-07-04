@@ -664,6 +664,9 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(line_post_cmd==(cmd_esc+'timecalc')):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc 12:00 -6 +0',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'timecalc','12:00 -6 +0',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'seen-quit')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit neutrak',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'seen-quit','neutrak',channel,nick,is_pm,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
 		py3queueln(sock,'PRIVMSG '+channel+' :Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
 	else:
@@ -675,6 +678,100 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 				break
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument ('+line_post_cmd+'); see '+cmd_esc+'help for a command list',1)
+
+def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
+	global unit_conv_list
+	
+	if(is_pm):
+		py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>         -> display an example of a command and its output',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>      -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> grabs topic summary from wikipedia',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>             -> checks definintion of word in gcide dictionary',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]           -> generates random number in range [1,sides]',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]      -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2> -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit <nick>          -> checks log files for last time when given nick was seen quitting (does NOT check if they\'re currently here)',3)
+		for conversion in unit_conv_list:
+			help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
+			while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
+				help_str+=' '
+			help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
+			py3queueln(sock,help_str,3)
+	else:
+		py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
+			
+
+#check when a user was last seen
+def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt'):
+	import datetime
+	
+	#read the last 5000 lines (or more if they're short)
+	backlog_chars=(512*5000)
+	#or the whole file, if it's smaller than that
+	file_size=os.path.getsize(log_file)
+	
+	fp=open(log_file,'r')
+	fp.seek(0,os.SEEK_END)
+	fp.seek(file_size-min(file_size,backlog_chars))
+	fcontent=fp.read()
+	fp.close()
+	
+	#start at the first complete line
+	#no partial line parsing
+	nl_idx=fcontent.find("\n")
+	if(nl_idx>=0):
+		fcontent=fcontent[nl_idx+1:]
+	
+	#time the user was last seen, as a *nix timestamp string
+	last_seen_time='0'
+	
+	#look for QUIT lines with the following format
+	#1467596281 :BasmatiRice!uid32945@2604:8300:100:200b:6667:2:0:80b1 QUIT :"Connection closed for inactivity"
+	for line in fcontent.split("\n"):
+		sp_idx=line.find(' ')
+		if(sp_idx<0):
+			continue
+		
+		#store timestamp so we can say when the user quit
+		timestamp=line[0:sp_idx]
+		line=line[sp_idx+1:]
+		
+		#skip PRIVMSG, PING, etc.
+		if(not line.startswith(':')):
+			continue
+		
+		#get the nick that quit
+		line=line[1:]
+		bang_idx=line.find('!')
+		if(bang_idx<0 or bang_idx>30):
+			continue
+		nick=line[0:bang_idx]
+		line=line[bang_idx+1:]
+		
+		#if this isn't who we were looking for then skip it
+		if(nick.lower()!=line_post_cmd.lower()):
+			continue
+		
+		sp_idx=line.find(' ')
+		if(sp_idx>=0 and line[sp_idx+1:].startswith('QUIT')):
+			print('[dbg] '+timestamp+' :'+line)
+			last_seen_time=timestamp
+		#if this wasn't a quit ignore it
+	
+	if(last_seen_time=='0'):
+		py3queueln(sock,'PRIVMSG '+channel+' :Warn: I don\'t have any recent QUITs from nick '+line_post_cmd+' in my logs; I might not have been there; they might not have existed; no idea, man',3)
+	else:
+		pretty_time=datetime.datetime.utcfromtimestamp(int(last_seen_time)).strftime('%Y-%m-%d %H:%M:%S UTC')
+		py3queueln(sock,'PRIVMSG '+channel+' :Nick '+line_post_cmd+' was last seen quitting a channel I was in at '+pretty_time+' ('+last_seen_time+'); check if they\'re here now; I don\'t do that',3)
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
@@ -756,32 +853,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument given to dbg, \''+line_post_cmd+'\'',1)
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
-		if(is_pm):
-			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>         -> display an example of a command and its output',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>      -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> grabs topic summary from wikipedia',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>             -> checks definintion of word in gcide dictionary',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]           -> generates random number in range [1,sides]',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]      -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2> -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
-			for conversion in unit_conv_list:
-				help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
-				while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
-					help_str+=' '
-				help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
-				py3queueln(sock,help_str,3)
-		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
-			
+		handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	#clear (low-priority) messages from the output queue
 	elif((cmd==(cmd_esc+'shup')) or (cmd==(cmd_esc+'shoo'))):
@@ -874,6 +946,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handled=True
 	elif(cmd==(cmd_esc+'timecalc')):
 		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
+		handled=True
+	elif(cmd==(cmd_esc+'seen-quit')):
+		handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		try:
