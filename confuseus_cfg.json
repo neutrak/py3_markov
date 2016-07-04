@@ -30,7 +30,7 @@
 	
 	"state_file":"state_file.txt",
 	
-	"answer_questions":true,
+	"answer_questions":false,
 	
 	"qa_sets":[
 		"why","because","?",
