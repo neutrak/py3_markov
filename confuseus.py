@@ -1029,9 +1029,17 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	dbg_str=''
 	
 	cmd_esc='!'
+		
+	#if this was a command for the bot
+	cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login)
+	if(cmd_handled):
+		#then it's handled and we're done
+		
+		#debug if the command gave us a debug string
+		dbg_str=cmd_dbg_str
 	
 	#support question/answer style markov chain-ing stuff
-	if(cmd.startswith(bot_nick)):
+	elif(cmd.startswith(bot_nick)):
 		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets)
 		
 		#if it didn't have that word as a starting state,
@@ -1061,14 +1069,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		dbg_output(sock,dbg_str)
 		
 		return (lines_since_write,lines_since_sort_chk)
-		
-	#if this was a command for the bot
-	cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login)
-	if(cmd_handled):
-		#then it's handled and we're done
-		
-		#debug if the command gave us a debug string
-		dbg_str=cmd_dbg_str
+	
 	#if it wasn't a command, then add this to the markov chain state and update the file on disk
 	else:
 		#if this was a pm then let the user know how to get help if they want it
