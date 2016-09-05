@@ -981,20 +981,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		#this prevents the bot from learning from unrecognized ! commands
 		#(which are usually meant for another bot)
 #		handled=True
-	#this was added at the request of NuclearWaffle, in an attempt, and I'm quoting here
-	#to "fuck with Proview"
-#	elif((len(cmd)>1) and odd_quest(cmd)):
-#		output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
-#		
-#		#prevent generating commands directed towards other bots,
-#		#if configured to do that
-#		if(not gen_cmd):
-#			if(output.startswith('!')):
-#				output='\\'+output
-#		
-#		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
-#		handled=True
-	
+
 	return (handled,dbg_str)
 
 
@@ -1011,8 +998,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	success,privmsg_cmd,line=get_token(line,' ')
 	success,channel,line=get_token(line,' ')
 	
-	if(line.startswith(':')):
-		line=line[1:]
+	line=line.lstrip(':')
 	
 	#debug
 	log_line('['+channel+'] <'+nick+'> '+line)
@@ -1134,6 +1120,17 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	elif(server_cmd=='433'):
 		bot_nick+='_'
 		py3queueln(sock,'NICK :'+bot_nick,1)
+	#got a NICK change; update the bot_nick var if it's us
+	#otherwise ignore
+	#":confuseus!1@hostmask.com NICK :accirc_2"
+	elif(server_cmd=='NICK'):
+		name_mask=server_name.lstrip(':')
+		bang_idx=name_mask.find('!')
+		if(bang_idx>=0):
+			old_nick=name_mask[0:bang_idx]
+			new_nick=line.lstrip(':')
+			if(old_nick==bot_nick):
+				bot_nick=new_nick
 	#got a PM, so reply
 	elif(server_cmd=='PRIVMSG'):
 		lines_since_write,lines_since_sort_chk=handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file,lines_since_write,lines_since_sort_chk)
