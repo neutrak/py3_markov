@@ -902,10 +902,11 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(cmd==(cmd_esc+'wiki')):
 		handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
+	#add wiktionary or some other dictionary with definitions if at all reasonable to do
+	#(we're using gcide)
 	elif(cmd==(cmd_esc+'define')):
 		handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
-	#TODO: add wiktionary or some other dictionary with definitions if at all reasonable to do
 	elif(cmd==(cmd_esc+'source')):
 		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
@@ -947,6 +948,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(cmd==(cmd_esc+'timecalc')):
 		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
+	#TODO: add weather forecast via darksky or yahoo weather or http://weather.gc.ca/canada_e.html (for Canada)
 	elif(cmd==(cmd_esc+'seen-quit')):
 		handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
