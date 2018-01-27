@@ -1162,28 +1162,33 @@ def main(state_file,use_ssl=True):
 	
 	#tcp client socket
 	sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-	base_sock=None
 	try:
 		sock.connect((host,port))
 		
 		if(use_ssl):
-			#store the non-ssl underlying socket
-			#because we need to set non-blocking on THAT
-			base_sock=sock
-			
-			#do an ssl handshake and use ssl
+			#use ssl
 			#NOTE: this does NOT do cert checking and so could easily be mitm'd
 			#but anything's better than nothing
-			sock=ssl.wrap_socket(sock)
+			sock=ssl.wrap_socket(sock,do_handshake_on_connect=False)
 	except:
 		print('Err: Could not connect to '+host+' on port '+str(port))
 		return 1
 	
 	#set the socket to be non-blocking
 	#this will throw a socket.error when there is no data to read
-	if(use_ssl):
-		base_sock.setblocking(0)
 	sock.setblocking(0)
+	if(use_ssl):
+		#we didn't actually do the handshake before we set non-blocking
+		#so we need to do that now before we continue
+		while True:
+			try:
+				sock.do_handshake()
+				break
+			except ssl.SSLWantReadError:
+				select.select([sock], [], [])
+			except ssl.SSLWantWriteError:
+				select.select([], [sock], [])
+
 	
 	py3queueln(sock,'NICK :'+bot_nick)
 	py3queueln(sock,'USER '+bot_nick+' 2 3 4')
