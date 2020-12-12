@@ -71,8 +71,8 @@ ignored_users=[]
 #		nick_b: {
 #			mode:'', #this means the user has no operator status
 #		}
+#		#NOTE: the bot itself is in this user list as well
 # 	}
-#	bot_mode:'o', #the bot's own mode, to know whether or not we should ask for ops
 #	last_op_rqst:<timestamp>, #the last time the bot asked for ops in this channel
 # }
 joined_channels={}
@@ -350,6 +350,40 @@ def irc_str_map(line_post_cmd):
 	if(line_post_cmd.startswith('/me')):
 		line_post_cmd='\x01ACTION'+line_post_cmd[len('/me'):]
 	return line_post_cmd
+
+#parse user information from a line text that was received from the server
+def parse_line_user_info(line):
+	#get some information (user, nick, host, etc.)
+	success,info,line=get_token(line,' ')
+	info=info.lstrip(':')
+	success,nick,info=get_token(info,'!')
+	success,realname,info=get_token(info,'@')
+	success,hostmask,info=get_token(info,' ')
+	success,command,line=get_token(line,' ')
+	
+	channel=''
+	if(command.upper()=='PRIVMSG'):
+		success,channel,line=get_token(line,' ')
+	
+	#clean up any leading or trailing characters
+	line=(line[1:] if line.startswith(':') else line)
+
+	if(command.upper()=='JOIN'):
+		channel=line
+	
+	#TODO: parse out user mode if/when possible
+	user_mode=''
+	
+	return {
+		'info':info,
+		'nick':nick,
+		'realname':realname,
+		'hostmask':hostmask,
+		'command':command,
+		'channel':channel,
+		'content':line,
+		'user_mode':user_mode,
+	}
 
 #handle conversions (stored in a generic unit_conv list)
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
@@ -1097,15 +1131,14 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	global qa_sets
 	
 	#get some information (user, nick, host, etc.)
-	success,info,line=get_token(line,' ')
-	info=info.lstrip(':')
-	success,nick,info=get_token(info,'!')
-	success,realname,info=get_token(info,'@')
-	success,hostmask,info=get_token(info,' ')
-	success,privmsg_cmd,line=get_token(line,' ')
-	success,channel,line=get_token(line,' ')
-	
-	line=line.lstrip(':')
+	line_info=parse_line_user_info(line)
+	info=line_info['info']
+	nick=line_info['nick']
+	realname=line_info['realname']
+	hostmask=line_info['hostmask']
+	command=line_info['command']
+	channel=line_info['channel']
+	line=line_info['content']
 	
 	#debug
 	log_line('['+channel+'] <'+nick+'> '+line)
@@ -1191,6 +1224,36 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	dbg_output(sock,dbg_str)
 	
 	return (lines_since_write,lines_since_sort_chk)
+
+#handle a join command that was sent by the server
+def handle_server_join(line):
+	global bot_nick
+	global joined_channels
+	
+	log_line('handle_server_join got line '+line) #debug
+	
+	#get some information (user, nick, host, etc.)
+	line_info=parse_line_user_info(line)
+	info=line_info['info']
+	nick=line_info['nick']
+	realname=line_info['realname']
+	hostmask=line_info['hostmask']
+	command=line_info['command']
+	channel=line_info['content']
+
+	if(not (channel in joined_channels)):
+		joined_channels[channel]={
+			'names':{},
+			'last_op_rqst':0
+		}
+	
+	#NOTE: the joining user might be ourselves, but that's fine
+	#since we want to be in the user list as well
+	joined_channels[channel]['names'][nick]={
+		'mode':''
+	}
+	
+	log_line('User '+nick+' joined channel '+channel) #debug
 	
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
@@ -1228,7 +1291,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	#create the channel structure if it doesn't already exist (in case we were doing the joining)
 	#if someone other than us was doing the joining, add them to the names list for this channel
 	elif(server_cmd=='JOIN'):
-		pass
+		handle_server_join(server_name+' '+server_cmd+' '+line)
 	#TODO: handle 353 names list, joins, and quits, to get a list of users for each channel we're in
 	#which includes channel operator information
 	#as channel operator information is necessary for oplist handling
@@ -1239,6 +1302,9 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	elif(server_cmd=='PART'):
 		pass
 	elif(server_cmd=='QUIT'):
+		pass
+	#TODO: track mode changes both to ourselves and others in the joined_channels list
+	elif(server_cmd=='MODE'):
 		pass
 	#nick in use, so change nick
 	elif(server_cmd=='433'):
