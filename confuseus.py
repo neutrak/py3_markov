@@ -61,6 +61,22 @@ ignored_users=[]
 
 #END JSON-configurable globals ==========================================================
 
+#a list of channels this bot is currently in, which includes user information
+#each channel entry is expected to be structured as follows (note that channel names and nicks are globally unique):
+#channel: {
+# 	names:{
+#		nick_a: {
+#			mode:'o',
+#		},
+#		nick_b: {
+#			mode:'', #this means the user has no operator status
+#		}
+# 	}
+#	bot_mode:'o', #the bot's own mode, to know whether or not we should ask for ops
+#	last_op_rqst:<timestamp>, #the last time the bot asked for ops in this channel
+# }
+joined_channels={}
+
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
 unit_conv_list=[]
@@ -664,6 +680,7 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(line_post_cmd==(cmd_esc+'timecalc')):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc 12:00 -6 +0',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'timecalc','12:00 -6 +0',channel,nick,is_pm,state_change,use_pg,db_login)
+	#TODO: replace seen-quit with just seen once we have a working user list for every channel
 	elif(line_post_cmd==(cmd_esc+'seen-quit')):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit neutrak',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'seen-quit','neutrak',channel,nick,is_pm,state_change,use_pg,db_login)
@@ -1204,10 +1221,14 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		py3queueln(sock,'MODE '+bot_nick+' +B',1)
 		for channel in autojoin_channels+dbg_channels:
 			py3queueln(sock,'JOIN :'+channel,1)
+	#TODO: on a server JOIN message, add the specified channel information to the joined_channels dict
+	elif(server_cmd=='JOIN'):
+		pass
 	#TODO: handle 353 names list, joins, and quits, to get a list of users for each channel we're in
 	#which includes channel operator information
 	#as channel operator information is necessary for oplist handling
-	
+	elif(server_cmd=='353'):
+		pass
 	#nick in use, so change nick
 	elif(server_cmd=='433'):
 		bot_nick+='_'
