@@ -667,6 +667,11 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(line_post_cmd==(cmd_esc+'seen-quit')):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit neutrak',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'seen-quit','neutrak',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'oplist')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oplist add neutrak',1)
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'oplist','add neutrak',channel,nick,is_pm,state_change,use_pg,db_login)
+	elif((line_post_cmd==(cmd_esc+'login')) or (line_post_cmd==(cmd_esc+'setpass'))):
+		py3queueln(sock,'PRIVMSG '+channel+' :Warn: command '+line_post_cmd+' is only valid in PM and contains sensitive information, so it does not have an example listed here',1)
 	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
 		py3queueln(sock,'PRIVMSG '+channel+' :Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
 	else:
@@ -684,25 +689,28 @@ def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	
 	if(is_pm):
 		py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                       -> generate text based on markov chains',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>         -> display an example of a command and its output',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>      -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                      -> displays this command list',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]       -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                      -> parts current channel (you can invite to me get back)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>         -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>              -> grabs topic summary from wikipedia',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>             -> checks definintion of word in gcide dictionary',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                    -> links the github url for this bot\'s source code',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>         -> grabs movie information from the open movie database',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist] -> checks given word against a dictionary and suggests fixes',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]           -> generates random number in range [1,sides]',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]      -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2> -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit <nick>          -> checks log files for last time when given nick was seen quitting (does NOT check if they\'re currently here)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                          -> generate text based on markov chains',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>            -> display an example of a command and its output',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>         -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                         -> displays this command list',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]          -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                         -> parts current channel (you can invite to me get back)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>            -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>                 -> grabs topic summary from wikipedia',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>                -> checks definintion of word in gcide dictionary',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                       -> links the github url for this bot\'s source code',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>            -> grabs movie information from the open movie database',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist]    -> checks given word against a dictionary and suggests fixes',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]              -> generates random number in range [1,sides]',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]         -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2>    -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit <nick>             -> checks log files for last time when given nick was seen quitting (does NOT check if they\'re currently here)',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oplist <add|rm|check> <user> -> allows channel operators to authorize/register other channel operators in a way that will persist between reconnections',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'login <pass> [channel]       -> [PM ONLY] if you are an authorized channel operator, logs you in to that channel',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'setpass <pass> [oldpass]     -> [PM ONLY] sets a passphrase for your channel operator account, if you have been invited to become a channel operator; if you have already set a passphrase oldpass is required for authorization',3)
 		for conversion in unit_conv_list:
 			help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
-			while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXX')):
+			while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXXXXX')):
 				help_str+=' '
 			help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
 			py3queueln(sock,help_str,3)
@@ -772,6 +780,72 @@ def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt')
 	else:
 		pretty_time=datetime.datetime.utcfromtimestamp(int(last_seen_time)).strftime('%Y-%m-%d %H:%M:%S UTC')
 		py3queueln(sock,'PRIVMSG '+channel+' :Nick '+line_post_cmd+' was last seen quitting a channel I was in at '+pretty_time+' ('+last_seen_time+'); check if they\'re here now; I don\'t do that',3)
+
+
+def require_pg(sock,cmd_esc,cmd,channel):
+	if(not use_pg):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+cmd+' is only valid if a postgres database is in use; ask the bot operator to fix the configuration to allow this command to be used',1)
+		return False
+	return True
+
+def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login):
+	if(not require_pg(sock,cmd_esc,cmd,channel)):
+		return
+	
+#	if(not (is_channel_operator(channel,nick))):
+#		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist can only be used by channel operators; come back when you have ops',1)
+#		return
+	
+	args=line_post_cmd.split(' ')
+	
+	if(len(args)<2):
+		py3queueln(sock,'PRIVMSG '+channel+' :Usage: '+cmd_esc+'oplist <add|rm|check> <user>',1)
+		return
+	
+	py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist command has not yet been implemented; check back soon',1)
+	return
+	
+	if(args[0]=='add'):
+		#TODO: if this user is already authorized for this channel, just say so and return
+		#TODO: if this user is not yet authorized for this channel but exists in the oplist_users table,
+		#then add an associated entry for oplist_channels
+		#and grant them ops now
+		#TODO: if this user is not authorized and has never been authorized before,
+		#delete any existing database oplist_users entries for this user where passphrase is null in case they were previously invited and didn't complete signup
+		#and create a new database entry with their current hostmask used to idenitfy them and null passphrase
+		return
+	elif(args[0]=='rm'):
+		#TODO: if the user currently has channel ops, de-op them
+		#TODO: remove the specified users from the list of channel operators for this channel
+		return
+	elif(args[0]=='check'):
+		#TODO: output the list of channels this user is authorized for
+		return
+
+def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login):
+	if(not require_pg(sock,cmd_esc,cmd,channel)):
+		return
+	
+	if(not is_pm):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'login is only valid in PM; you should change your passphrase IMMEDIATELY with '+cmd_esc+'setpass',1)
+		return
+	
+	#TODO: write this
+	py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'login command has not yet been implemented; check back soon',1)
+	return
+
+def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login):
+	if(not require_pg(sock,cmd_esc,cmd,channel)):
+		return
+	
+	if(not is_pm):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'setpass is only valid in PM (and use a different passphrase from the one you just posted in the channel...)',1)
+		return
+	
+	#TODO: write this
+	py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'setpass command has not yet been implemented; check back soon',1)
+	return
+
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
 	global gen_cmd
@@ -952,6 +1026,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 	elif(cmd==(cmd_esc+'seen-quit')):
 		handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
+	elif(cmd==(cmd_esc+'oplist')):
+		handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login)
+		handled=True
+	#login (op aliased) -> grant the user the appropriate mode on all channels they are authorized for, or a specific channel if a channel was specified
+	elif((cmd==(cmd_esc+'login')) or (cmd==(cmd_esc+'op'))):
+		handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login)
+		handled=True
+	#setpass -> register a user who has a nick and hostmask that was invited by someone using !oplist add
+	elif(cmd==(cmd_esc+'setpass')):
+		handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login)
+		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		try:
 			#alternate conversion syntax
@@ -1119,6 +1204,10 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		py3queueln(sock,'MODE '+bot_nick+' +B',1)
 		for channel in autojoin_channels+dbg_channels:
 			py3queueln(sock,'JOIN :'+channel,1)
+	#TODO: handle 353 names list, joins, and quits, to get a list of users for each channel we're in
+	#which includes channel operator information
+	#as channel operator information is necessary for oplist handling
+	
 	#nick in use, so change nick
 	elif(server_cmd=='433'):
 		bot_nick+='_'
@@ -1141,6 +1230,13 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	elif(server_cmd=='INVITE'):
 		succcesss,name,channel=get_token(line,' :')
 		py3queueln(sock,'JOIN :'+channel,1)
+	
+	#TODO: add oplist-related handling here, specifically
+	#for each channel this bot is in
+	#	if there is at least one user authorized to have ops in this channel in the oplist_channels database table
+	#		if this bot doesn't have ops in that channel
+	#			and it's been at least 30 minutes since this bot asked for OPs last
+	#			ping channel operators and ask them to grant OPs to the bot
 	
 	return (lines_since_write,lines_since_sort_chk)
 	

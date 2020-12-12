@@ -1,14 +1,20 @@
 {
 	"bot_nick":"confuseus",
-	"host":"ssl.irc.atw-inter.net",
+	"host":"moo.slashnet.org",
 	"port":6697,
+	"prod_host":"ssl.irc.atw-inter.net",
+	"prod_port":6697,
 	"use_ssl":true,
 	"gen_cmd":false,
 	"autojoin_channels":[
+		"#FaiD3.0"
+		],
+	"dbg_channels":[],
+	"autojoin_channels_prod":[
 		"#imgurians",
 		"#imgurians-tech"
 		],
-	"dbg_channels":[
+	"dbg_channels_prod":[
 		"+confuseus-dbg"
 		],
 	"authed_users":[
@@ -24,9 +30,9 @@
 	"prefix_len":2,
 	
 	"use_pg":true,
-	"pg_user":"sql",
-	"pg_passwd":"sql",
-	"pg_dbname":"markovdb",
+	"pg_user":"confuseus",
+	"pg_passwd":"e9P7XXaWa8YsMU6X",
+	"pg_dbname":"confuseus",
 	
 	"state_file":"state_file.txt",
 	
