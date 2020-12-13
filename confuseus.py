@@ -1283,6 +1283,8 @@ def handle_server_join(line):
 	log_line('[JOIN] '+nick+' joined '+channel) #debug
 
 def handle_server_353(line):
+	global joined_channels
+	
 	#confuseus @ #faid3.0 :confuseus mz Spock @neutrak
 	success,my_name,line=get_token(line,' ')
 	success,my_status,line=get_token(line,' ')
