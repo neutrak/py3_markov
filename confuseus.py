@@ -53,7 +53,7 @@ qa_sets=[]
 
 #users allowed to !shup the bot
 #(aka clear outgoing queue)
-#TODO: if this list is ever used for anything more important, be sure to authenticate in some way, or at least check for channel ops
+#TODO: replace authed_users with database-stored oplist user accounts for shup and debug command, etc.
 authed_users=[]
 
 #users to ignore (bots)
@@ -80,6 +80,7 @@ joined_channels={}
 
 seconds_bw_op_nag=1800 #30 minutes
 #seconds_bw_op_nag=60 #debug; 1 minute
+#seconds_bw_op_nag=300 #debug; 5 minutes
 
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
@@ -375,9 +376,6 @@ def parse_line_info(line):
 	if(command.upper()=='JOIN'):
 		channel=line
 	
-	#TODO: parse out user mode if/when possible
-	user_mode=''
-	
 	return {
 		'info':info,
 		'nick':nick,
@@ -386,7 +384,6 @@ def parse_line_info(line):
 		'command':command,
 		'channel':channel,
 		'content':line,
-		'user_mode':user_mode,
 	}
 
 #handle conversions (stored in a generic unit_conv list)
@@ -907,10 +904,25 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 	channel_results=postgre_ret(channel,new_op_nick)
 	
 	if(args[0]=='add'):
+		if(len(args)<3):
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
+			db_handle.close()
+			return
+		
+		#NOTE: the hostmask of the command is the channel operator that is adding the user
+		#so we can't just use the hostmask that was part of this command
+		#but rather we need to take this hostmask as an argument
+		hostmask=args[2]
+		
+		if(user_results[0]['pass_hash'] is None):
+			pg_query='UPDATE user_accounts SET hostmasks=$1 WHERE nick=$2'
+			postgre_ret=db_handle.prepare(pg_query)
+			update_result=postgre_ret([hostmask],new_op_nick)
+		
 		#if this user is already authorized for this channel, just say so and return
 		if((len(channel_results)>0) and (len(user_results)>0)):
 			if(user_results[0]['pass_hash'] is None):
-				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  If the hostmask changed since then, a channel operator will need to re-add the user.  ',1)
+				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  Hostmask has been updated to '+str([hostmask])+' but a password still needs to be set.  ',1)
 			else:
 				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' and cannot be added again',1)
 		
@@ -925,17 +937,10 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 			
 			#and grant them ops now
 			py3queueln(sock,'MODE '+channel+' +o '+new_op_nick,1)
-		elif(len(args)<3):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
 		#if this user is not authorized and has never been authorized before,
 		#create a new database entry with their current hostmask used to idenitfy them and null password
 		#they will be identified by hostmask until they set a password
 		else:
-			#NOTE: the hostmask of the command is the channel operator that is adding the user
-			#so we can't just use the hostmask that was part of this command
-			#but rather we need to take this hostmask as an argument
-			hostmask=args[2]
-			
 			pg_query='INSERT INTO user_accounts (nick,pass_hash,hostmasks) VALUES ($1,$2,$3)'
 			postgre_ret=db_handle.prepare(pg_query)
 			insert_result=postgre_ret(new_op_nick,None,[hostmask])
@@ -1006,7 +1011,7 @@ def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_log
 	channel_results=postgre_ret(nick)
 	
 	if(len(user_results)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot log in because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first',1)
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot log in because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
 		db_handle.close()
 		return
 	
@@ -1202,9 +1207,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
 		if(not is_pm):
-			#TODO: only allow !part to be issued by channel operators, not normal users
+			#only allow !part to be issued by channel operators, not normal users
 			#since this bot will now handle oplist-related tasks as well
-			py3queueln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)',1)
+			if(is_channel_operator(channel,nick)):
+				py3queueln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)',1)
+			else:
+				py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'part can only be used by channel operators; come back when you have ops',1)
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!',1)
 		handled=True
@@ -1376,7 +1384,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#if this was a command for the bot, handle it
 		cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	except Exception as e:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception '+str(e)+'; tell neutrak the command you used to get this and he\'ll look into it',1)
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception '+(str(e).replace("\n",' '))+'; tell neutrak the command you used to get this and he\'ll look into it',1)
 		return (lines_since_write,lines_since_sort_chk)
 	
 	if(cmd_handled):
@@ -1596,6 +1604,9 @@ def run_periodic_op_rqst(sock):
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
 	global joined_channels
+
+	#request ops as needed to make !oplist function correctly
+	run_periodic_op_rqst(sock)
 	
 	#ignore blank lines
 	if(line==''):
@@ -1667,9 +1678,6 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	elif(server_cmd=='INVITE'):
 		succcesss,name,channel=get_token(line,' :')
 		py3queueln(sock,'JOIN :'+channel,1)
-	
-	#request ops as needed to make !oplist function correctly
-	run_periodic_op_rqst(sock)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	

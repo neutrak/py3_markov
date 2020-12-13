@@ -4,4 +4,5 @@ log.txt
 *_log_*.txt
 *state_file.txt
 .*.swp
+.swp
 
