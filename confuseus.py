@@ -1353,7 +1353,25 @@ def handle_server_quit(line):
 			joined_channels[channel]['names'].pop(nick)
 	
 	log_line('[QUIT] joined_channels='+json.dumps(joined_channels)) #debug
+
+def handle_server_mode(sock,line):
+	global joined_channels
 	
+	#:neutrak!~neutrak@hostmask MODE #bot-testing +o confuseus
+	
+	success,channel,line=get_token(line,' ')
+	
+	#ignore network-wide user settings for this user
+	#we're only interested in channel mode changes for now
+	if(channel==bot_nick):
+		return
+	
+	#NOTE: mode changes can get really complicated with potential for +ooo type expressions
+	#so in order to be as reliable (and lazy) as possible instead of parsing all of that
+	#we just send a NAMES request after every mode change in a channel
+	#to get an updated list of what the modes ended up at after all was said and done
+	
+	py3queueln(sock,'NAMES '+channel,1)
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
@@ -1404,9 +1422,9 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		handle_server_part(full_line)
 	elif(server_cmd=='QUIT'):
 		handle_server_quit(full_line)
-	#TODO: track mode changes both to ourselves and others in the joined_channels list
+	#track mode changes both to ourselves and others in the joined_channels list
 	elif(server_cmd=='MODE'):
-		pass
+		handle_server_mode(sock,line)
 	#nick in use, so change nick
 	elif(server_cmd=='433'):
 		bot_nick+='_'
