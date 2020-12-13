@@ -15,13 +15,14 @@ CREATE TABLE IF NOT EXISTS states(
 	PRIMARY KEY (prefix,suffix)
 );
 
-CREATE TABLE IF NOT EXISTS oplist_users(
+--a table of channel operators to be used for the !oplist commands
+CREATE TABLE IF NOT EXISTS user_accounts(
 	--the nick of this operator
 	nick VARCHAR(256) NOT NULL PRIMARY KEY,
 	
 	--the bcrypted hash of this user's passphrase
 	--null iff the user has not yet accepted their invitation
-	passphrase VARCHAR(256),
+	pass_hash VARCHAR(256),
 	
 	--the list (array) of hostmasks where this user has been seen before
 	--the only time this matters for authorization is when the passphrase is null,
@@ -29,17 +30,17 @@ CREATE TABLE IF NOT EXISTS oplist_users(
 	hostmasks VARCHAR(256)[]
 );
 
---a table of channel operators to be used for the !oplist commands
-CREATE TABLE IF NOT EXISTS oplist_channels(
-	nick VARCHAR(256) REFERENCES oplist_users(nick),
+--a table of channel permissions for the operators in the user_accounts table
+CREATE TABLE IF NOT EXISTS user_channel_modes(
+	nick VARCHAR(256) REFERENCES user_accounts(nick),
 	
 	--the name of the channel this user is an operator in
 	channel VARCHAR(256) NOT NULL,
 
 	--the mode in this channel that this this user is authorized for
-	ch_mode VARCHAR(8) NOT NULL DEFAULT 'o',
+	mode_str VARCHAR(8) NOT NULL DEFAULT 'o',
 
 	--an operator authorization is determined by a unique combination of channel and nick
-	PRIMARY KEY (channel,nick,ch_mode)
+	PRIMARY KEY (channel,nick,mode_str)
 );
 
