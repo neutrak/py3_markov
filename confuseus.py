@@ -351,8 +351,8 @@ def irc_str_map(line_post_cmd):
 		line_post_cmd='\x01ACTION'+line_post_cmd[len('/me'):]
 	return line_post_cmd
 
-#parse user information from a line text that was received from the server
-def parse_line_user_info(line):
+#parse user and other information from a line text that was received from the server
+def parse_line_info(line):
 	#get some information (user, nick, host, etc.)
 	success,info,line=get_token(line,' ')
 	info=info.lstrip(':')
@@ -832,6 +832,33 @@ def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt')
 		py3queueln(sock,'PRIVMSG '+channel+' :Nick '+line_post_cmd+' was last seen quitting a channel I was in at '+pretty_time+' ('+last_seen_time+'); check if they\'re here now; I don\'t do that',3)
 
 
+def user_mode_letter(user_mode_symbol):
+	#channel ops
+	if(user_mode_symbol=='@'):
+		return 'o'
+	#half channel ops
+	elif(user_mode_symbol=='%'):
+		return 'h'
+	#voice
+	elif(user_mode_symbol=='+'):
+		return 'v'
+	return ''
+
+#returns the user mode letters (o,h,v) rather than symbols (@,%,+)
+#also returns the value of the nick without these symbols included
+def user_mode_symbols_to_letters(nick_with_mode_symbols):
+	user_mode_symbols=nick_with_mode_symbols
+	user_mode_letters=''
+	idx=0
+	while((idx<len(user_mode_symbols)) and (user_mode_letter(user_mode_symbols[idx])!='')):
+		user_mode_letters=user_mode_letter(user_mode_symbols[idx])
+		idx+=1
+	
+	#2nd return value is the user nick, when this is used on a nick string
+	nick_sans_mode=(user_mode_symbols[idx:] if (idx<len(user_mode_symbols)) else '')
+	return user_mode_letters,nick_sans_mode
+
+
 def require_pg(sock,cmd_esc,cmd,channel):
 	if(not use_pg):
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+cmd+' is only valid if a postgres database is in use; ask the bot operator to fix the configuration to allow this command to be used',1)
@@ -1131,7 +1158,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	global qa_sets
 	
 	#get some information (user, nick, host, etc.)
-	line_info=parse_line_user_info(line)
+	line_info=parse_line_info(line)
 	info=line_info['info']
 	nick=line_info['nick']
 	realname=line_info['realname']
@@ -1233,7 +1260,7 @@ def handle_server_join(line):
 	log_line('handle_server_join got line '+line) #debug
 	
 	#get some information (user, nick, host, etc.)
-	line_info=parse_line_user_info(line)
+	line_info=parse_line_info(line)
 	info=line_info['info']
 	nick=line_info['nick']
 	realname=line_info['realname']
@@ -1253,11 +1280,38 @@ def handle_server_join(line):
 		'mode':''
 	}
 	
-	log_line('User '+nick+' joined channel '+channel) #debug
+	log_line('[JOIN] '+nick+' joined '+channel) #debug
+
+def handle_server_353(line):
+	#confuseus @ #faid3.0 :confuseus mz Spock @neutrak
+	success,my_name,line=get_token(line,' ')
+	success,my_status,line=get_token(line,' ')
+	success,channel,line=get_token(line,' ')
 	
+	line=line.lstrip(':')
+	
+	joined_channels[channel]['names'][bot_nick]['mode'],empty_str=user_mode_symbols_to_letters(my_status)
+	
+	names=line.split(' ')
+	for name in names:
+		mode_str,nick_sans_mode=user_mode_symbols_to_letters(name)
+		
+		
+		if(not (nick_sans_mode in joined_channels[channel]['names'])):
+			joined_channels[channel]['names'][nick_sans_mode]={}
+		
+		#NOTE: mode strings might update if another names list is requested later
+		#so we override any existing mode information
+		joined_channels[channel]['names'][nick_sans_mode]={
+			'mode':mode_str
+		}
+
+	
+	log_line('[353] channel info is now'+json.dumps(joined_channels[channel])) #debug
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
+	global joined_channels
 	
 	#ignore blank lines
 	if(line==''):
@@ -1273,6 +1327,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	elif(line.startswith('ERROR')):
 		exit(1)
 	
+	full_line=line
 	success,server_name,line=get_token(line,' ')
 	success,server_cmd,line=get_token(line,' ')
 	
@@ -1291,12 +1346,12 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	#create the channel structure if it doesn't already exist (in case we were doing the joining)
 	#if someone other than us was doing the joining, add them to the names list for this channel
 	elif(server_cmd=='JOIN'):
-		handle_server_join(server_name+' '+server_cmd+' '+line)
+		handle_server_join(full_line)
 	#TODO: handle 353 names list, joins, and quits, to get a list of users for each channel we're in
 	#which includes channel operator information
 	#as channel operator information is necessary for oplist handling
 	elif(server_cmd=='353'):
-		pass
+		handle_server_353(line)
 	#TODO: on PART and QUIT, remove the user from the appropriate channel information
 	#since they are no longer present
 	elif(server_cmd=='PART'):
@@ -1323,7 +1378,7 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 				bot_nick=new_nick
 	#got a PM, so reply
 	elif(server_cmd=='PRIVMSG'):
-		lines_since_write,lines_since_sort_chk=handle_privmsg(sock,server_name+' '+server_cmd+' '+line,state_change,state_file,lines_since_write,lines_since_sort_chk)
+		lines_since_write,lines_since_sort_chk=handle_privmsg(sock,full_line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	#got an invite, so join
 	elif(server_cmd=='INVITE'):
 		succcesss,name,channel=get_token(line,' :')
