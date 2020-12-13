@@ -876,7 +876,7 @@ def require_pg(sock,cmd_esc,cmd,channel):
 		return False
 	return True
 
-def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle):
+def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results):
 	if(len(args)<3):
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
 		return
@@ -886,7 +886,7 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 	#but rather we need to take this hostmask as an argument
 	hostmask=args[2]
 	
-	if(user_results[0]['pass_hash'] is None):
+	if((len(user_results)>0) and (user_results[0]['pass_hash'] is None)):
 		pg_query='UPDATE user_accounts SET hostmasks=$1 WHERE nick=$2'
 		postgre_ret=db_handle.prepare(pg_query)
 		update_result=postgre_ret([hostmask],new_op_nick)
@@ -924,7 +924,7 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
 	
 
-def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle):
+def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results):
 	#remove the specified users from the list of channel operators for this channel
 	pg_query='DELETE FROM user_channel_modes WHERE nick=$1 AND channel=$2'
 	postgre_ret=db_handle.prepare(pg_query)
@@ -965,14 +965,14 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 	channel_results=postgre_ret(channel,new_op_nick)
 	
 	if(args[0]=='add'):
-		handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle)
+		handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results)
 		db_handle.close()
 		return
 	elif(args[0]=='rm'):
-		handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle)
+		handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results)
 		db_handle.close()
 		return
-	elif(args[0]=='check'):
+	elif((args[0]=='check') or (args[0]=='status')):
 		#if this user is already authorized for this channel, just say so and return
 		if((len(channel_results)>0) and (len(user_results)>0)):
 			if(user_results[0]['pass_hash'] is None):
@@ -1067,7 +1067,7 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 	user_results=postgre_ret(nick)
 	
 	if(len(user_results)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first',1)
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
 		db_handle.close()
 		return
 	
