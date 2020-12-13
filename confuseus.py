@@ -876,6 +876,67 @@ def require_pg(sock,cmd_esc,cmd,channel):
 		return False
 	return True
 
+def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle):
+	if(len(args)<3):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
+		return
+	
+	#NOTE: the hostmask of the command is the channel operator that is adding the user
+	#so we can't just use the hostmask that was part of this command
+	#but rather we need to take this hostmask as an argument
+	hostmask=args[2]
+	
+	if(user_results[0]['pass_hash'] is None):
+		pg_query='UPDATE user_accounts SET hostmasks=$1 WHERE nick=$2'
+		postgre_ret=db_handle.prepare(pg_query)
+		update_result=postgre_ret([hostmask],new_op_nick)
+	
+	#if this user is already authorized for this channel, just say so and return
+	if((len(channel_results)>0) and (len(user_results)>0)):
+		if(user_results[0]['pass_hash'] is None):
+			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  Hostmask has been updated to '+str([hostmask])+' but a password still needs to be set.  ',1)
+		else:
+			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' and cannot be added again',1)
+	
+	#if this user is not yet authorized for this channel but exists in the oplist_users table,
+	#then add an associated entry for user_channel_modes
+	elif(len(user_results)>0):
+		pg_query='INSERT INTO user_channel_modes (nick,channel,mode_str) VALUES ($1,$2,$3)'
+		postgre_ret=db_handle.prepare(pg_query)
+		insert_result=postgre_ret(new_op_nick,channel,'o')
+		
+		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was successfully granted channel ops on '+channel,1)
+		
+		#and grant them ops now
+		py3queueln(sock,'MODE '+channel+' +o '+new_op_nick,1)
+	#if this user is not authorized and has never been authorized before,
+	#create a new database entry with their current hostmask used to idenitfy them and null password
+	#they will be identified by hostmask until they set a password
+	else:
+		pg_query='INSERT INTO user_accounts (nick,pass_hash,hostmasks) VALUES ($1,$2,$3)'
+		postgre_ret=db_handle.prepare(pg_query)
+		insert_result=postgre_ret(new_op_nick,None,[hostmask])
+
+		pg_query='INSERT INTO user_channel_modes (nick,channel,mode_str) VALUES ($1,$2,$3)'
+		postgre_ret=db_handle.prepare(pg_query)
+		insert_result=postgre_ret(new_op_nick,channel,'o')
+		
+		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
+	
+
+def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle):
+	#remove the specified users from the list of channel operators for this channel
+	pg_query='DELETE FROM user_channel_modes WHERE nick=$1 AND channel=$2'
+	postgre_ret=db_handle.prepare(pg_query)
+	delete_result=postgre_ret(new_op_nick,channel)
+	
+	#if the user currently has channel ops, de-op them
+	if(new_op_nick in joined_channels[channel]['names']):
+		py3queueln(sock,'MODE '+channel+' -o '+new_op_nick,1)
+	
+	py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has been removed from the channel op list for '+channel+'; their mode authorizations on other channels remain unchanged',1)
+
+
 def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login):
 	if(not require_pg(sock,cmd_esc,cmd,channel)):
 		return
@@ -904,67 +965,11 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 	channel_results=postgre_ret(channel,new_op_nick)
 	
 	if(args[0]=='add'):
-		if(len(args)<3):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
-			db_handle.close()
-			return
-		
-		#NOTE: the hostmask of the command is the channel operator that is adding the user
-		#so we can't just use the hostmask that was part of this command
-		#but rather we need to take this hostmask as an argument
-		hostmask=args[2]
-		
-		if(user_results[0]['pass_hash'] is None):
-			pg_query='UPDATE user_accounts SET hostmasks=$1 WHERE nick=$2'
-			postgre_ret=db_handle.prepare(pg_query)
-			update_result=postgre_ret([hostmask],new_op_nick)
-		
-		#if this user is already authorized for this channel, just say so and return
-		if((len(channel_results)>0) and (len(user_results)>0)):
-			if(user_results[0]['pass_hash'] is None):
-				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  Hostmask has been updated to '+str([hostmask])+' but a password still needs to be set.  ',1)
-			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' and cannot be added again',1)
-		
-		#if this user is not yet authorized for this channel but exists in the oplist_users table,
-		#then add an associated entry for user_channel_modes
-		elif(len(user_results)>0):
-			pg_query='INSERT INTO user_channel_modes (nick,channel,mode_str) VALUES ($1,$2,$3)'
-			postgre_ret=db_handle.prepare(pg_query)
-			insert_result=postgre_ret(new_op_nick,channel,'o')
-			
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was successfully granted channel ops on '+channel,1)
-			
-			#and grant them ops now
-			py3queueln(sock,'MODE '+channel+' +o '+new_op_nick,1)
-		#if this user is not authorized and has never been authorized before,
-		#create a new database entry with their current hostmask used to idenitfy them and null password
-		#they will be identified by hostmask until they set a password
-		else:
-			pg_query='INSERT INTO user_accounts (nick,pass_hash,hostmasks) VALUES ($1,$2,$3)'
-			postgre_ret=db_handle.prepare(pg_query)
-			insert_result=postgre_ret(new_op_nick,None,[hostmask])
-
-			pg_query='INSERT INTO user_channel_modes (nick,channel,mode_str) VALUES ($1,$2,$3)'
-			postgre_ret=db_handle.prepare(pg_query)
-			insert_result=postgre_ret(new_op_nick,channel,'o')
-			
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
-		
+		handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle)
 		db_handle.close()
 		return
 	elif(args[0]=='rm'):
-		#remove the specified users from the list of channel operators for this channel
-		pg_query='DELETE FROM user_channel_modes WHERE nick=$1 AND channel=$2'
-		postgre_ret=db_handle.prepare(pg_query)
-		delete_result=postgre_ret(new_op_nick,channel)
-		
-		#if the user currently has channel ops, de-op them
-		if(new_op_nick in joined_channels[channel]['names']):
-			py3queueln(sock,'MODE '+channel+' -o '+new_op_nick,1)
-		
-		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has been removed from the channel op list for '+channel+'; their mode authorizations on other channels remain unchanged',1)
-		
+		handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle)
 		db_handle.close()
 		return
 	elif(args[0]=='check'):
@@ -1466,8 +1471,6 @@ def handle_server_join(line):
 	joined_channels[channel]['names'][nick]={
 		'mode':''
 	}
-	
-#	log_line('{JOIN} channel info is now '+str(joined_channels[channel])) #debug
 
 def handle_server_353(line):
 	global joined_channels
@@ -1498,8 +1501,6 @@ def handle_server_353(line):
 			'mode':mode_str
 		}
 
-	
-#	log_line('{353} channel info is now '+str(joined_channels[channel])) #debug
 
 def handle_server_part(line):
 	global joined_channels
@@ -1515,17 +1516,11 @@ def handle_server_part(line):
 	#then remove the entire joined channels entry for this channel
 	if(nick==bot_nick):
 		joined_channels.pop(channel)
-	#otherwise, just remove this user's information from the channel names list	
+	#otherwise, just remove this user's information from the channel names list
 	else:
 		if(nick in joined_channels[channel]['names']):
 			joined_channels[channel]['names'].pop(nick)
-	
-	'''
-	if(nick!=bot_nick):
-		log_line('{PART} channel info is now '+str(joined_channels[channel])) #debug
-	else:
-		log_line('{PART} we left the channel, so there is no longer any channel info for it') #debug
-	'''
+
 
 def handle_server_quit(line):
 	global joined_channels
@@ -1542,8 +1537,7 @@ def handle_server_quit(line):
 	for channel in joined_channels:
 		if(nick in joined_channels[channel]['names']):
 			joined_channels[channel]['names'].pop(nick)
-	
-#	log_line('{QUIT} joined_channels='+str(joined_channels)) #debug
+
 
 def handle_server_mode(sock,line):
 	global joined_channels

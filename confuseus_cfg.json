@@ -2,19 +2,12 @@
 	"bot_nick":"confuseus",
 	"host":"moo.slashnet.org",
 	"port":6697,
-	"prod_host":"ssl.irc.atw-inter.net",
-	"prod_port":6697,
 	"use_ssl":true,
 	"gen_cmd":false,
 	"autojoin_channels":[
 		"#bot-testing"
 		],
-	"dbg_channels":[],
-	"autojoin_channels_prod":[
-		"#imgurians",
-		"#imgurians-tech"
-		],
-	"dbg_channels_prod":[
+	"dbg_channels":[
 		"+confuseus-dbg"
 		],
 	"authed_users":[
