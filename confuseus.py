@@ -793,7 +793,7 @@ def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt')
 	last_seen_time='0'
 	
 	#look for QUIT lines with the following format
-	#1467596281 :BasmatiRice!uid32945@2604:8300:100:200b:6667:2:0:80b1 QUIT :"Connection closed for inactivity"
+	#1467596281 :BasmatiRice!uid32945@hostmask QUIT :"Connection closed for inactivity"
 	for line in fcontent.split("\n"):
 		sp_idx=line.find(' ')
 		if(sp_idx<0):
@@ -1257,8 +1257,6 @@ def handle_server_join(line):
 	global bot_nick
 	global joined_channels
 	
-	log_line('handle_server_join got line '+line) #debug
-	
 	#get some information (user, nick, host, etc.)
 	line_info=parse_line_info(line)
 	info=line_info['info']
@@ -1280,7 +1278,7 @@ def handle_server_join(line):
 		'mode':''
 	}
 	
-	log_line('[JOIN] '+nick+' joined '+channel) #debug
+	log_line('[JOIN] channel info is now '+json.dumps(joined_channels[channel])) #debug
 
 def handle_server_353(line):
 	global joined_channels
@@ -1298,6 +1296,9 @@ def handle_server_353(line):
 	for name in names:
 		mode_str,nick_sans_mode=user_mode_symbols_to_letters(name)
 		
+		#skip empty string; nicks can't be blank
+		if(nick_sans_mode==''):
+			continue
 		
 		if(not (nick_sans_mode in joined_channels[channel]['names'])):
 			joined_channels[channel]['names'][nick_sans_mode]={}
@@ -1309,7 +1310,50 @@ def handle_server_353(line):
 		}
 
 	
-	log_line('[353] channel info is now'+json.dumps(joined_channels[channel])) #debug
+	log_line('[353] channel info is now '+json.dumps(joined_channels[channel])) #debug
+
+def handle_server_part(line):
+	global joined_channels
+	
+	#:neu_tst!~neutrak@hostmask PART #bot-testing
+	
+	#get some information (user, nick, host, etc.)
+	line_info=parse_line_info(line)
+	nick=line_info['nick']
+	channel=line_info['content']
+	
+	#if it was us leaving the channel
+	#then remove the entire joined channels entry for this channel
+	if(nick==bot_nick):
+		joined_channels.pop(channel)
+	#otherwise, just remove this user's information from the channel names list	
+	else:
+		if(nick in joined_channels[channel]['names']):
+			joined_channels[channel]['names'].pop(nick)
+	
+	if(nick!=bot_nick):
+		log_line('[PART] channel info is now '+json.dumps(joined_channels[channel])) #debug
+	else:
+		log_line('[PART] we left the channel, so there is no longer any channel info for it') #debug
+
+def handle_server_quit(line):
+	global joined_channels
+	
+	#NOTE: for quit we don't need to account for the case where it's us doing the quitting
+	#because in that case we disconnect from the server
+	
+	#:neu_tst!~neutrak@hostmask QUIT :Quit: neu_tst
+	
+	#get some information (user, nick, host, etc.)
+	line_info=parse_line_info(line)
+	nick=line_info['nick']
+	
+	for channel in joined_channels:
+		if(nick in joined_channels[channel]['names']):
+			joined_channels[channel]['names'].pop(nick)
+	
+	log_line('[QUIT] joined_channels='+json.dumps(joined_channels)) #debug
+	
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
@@ -1344,22 +1388,22 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		py3queueln(sock,'MODE '+bot_nick+' +B',1)
 		for channel in autojoin_channels+dbg_channels:
 			py3queueln(sock,'JOIN :'+channel,1)
-	#TODO: on a server JOIN message, add the specified channel information to the joined_channels dict
+	#on a server JOIN message, add the specified channel information to the joined_channels dict
 	#create the channel structure if it doesn't already exist (in case we were doing the joining)
 	#if someone other than us was doing the joining, add them to the names list for this channel
 	elif(server_cmd=='JOIN'):
 		handle_server_join(full_line)
-	#TODO: handle 353 names list, joins, and quits, to get a list of users for each channel we're in
+	#handle 353 names list, joins, and quits, to get a list of users for each channel we're in
 	#which includes channel operator information
 	#as channel operator information is necessary for oplist handling
 	elif(server_cmd=='353'):
 		handle_server_353(line)
-	#TODO: on PART and QUIT, remove the user from the appropriate channel information
+	#on PART and QUIT, remove the user from the appropriate channel information
 	#since they are no longer present
 	elif(server_cmd=='PART'):
-		pass
+		handle_server_part(full_line)
 	elif(server_cmd=='QUIT'):
-		pass
+		handle_server_quit(full_line)
 	#TODO: track mode changes both to ourselves and others in the joined_channels list
 	elif(server_cmd=='MODE'):
 		pass

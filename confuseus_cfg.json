@@ -7,7 +7,8 @@
 	"use_ssl":true,
 	"gen_cmd":false,
 	"autojoin_channels":[
-		"#FaiD3.0"
+		"#FaiD3.0",
+		"#bot-testing"
 		],
 	"dbg_channels":[],
 	"autojoin_channels_prod":[
