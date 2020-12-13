@@ -1,13 +1,15 @@
 {
 	"bot_nick":"confuseus",
-	"host":"moo.slashnet.org",
+	"host":"ssl.irc.atw-inter.net",
 	"port":6697,
 	"use_ssl":true,
 	"gen_cmd":false,
 	"autojoin_channels":[
-		"#bot-testing"
+		"#imgurians",
+		"#imgurians-tech"
 		],
 	"dbg_channels":[
+		"+confuseus-dbg"
 		],
 	"authed_users":[
 		"neutrak",

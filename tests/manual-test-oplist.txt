@@ -1,0 +1,41 @@
+MANUAL TEST PROCEDURE FOR !oplist, etc.:
+	for test purposes only, set the op nag timeout to 5 minutes
+	
+	clear database
+	connect and join channel; bot not granted ops
+	non-op -> !oplist -> error, user needs ops
+	non-op -> !login in PM -> error, user has no account
+	op -> !oplist check self -> error, bot needs ops
+	op -> mode +o bot
+	op -> !oplist check self -> success; user doesn't exist
+	op -> !oplist add self <bad hostmask> -> success, must setpass
+	op -> !setpass in channel -> error, must use PM
+	op -> !setpass in PM -> error, hostmask wrong
+	op -> !oplist add self <correct hostmask> -> success, must setpass
+	op -> !setpass in PM with too short pass -> error; too short
+	op -> !setpass im PM with good pass -> success
+	op -> mode #channel -o self
+	op -> !login in channel (with wrong pass) -> error, must use PM
+	op -> !login in PM with wrong pass -> error
+	op -> !login in PM with right pass -> success, granted channel ops
+	end bot session; kill bot
+	
+	connect and join channel; bot not granted ops
+	wait until nag timeout; ensure bot requests ops
+	op -> mode +o bot
+	op -> mode #channel -o self
+	op -> !login in PM with right pass -> success, granted channel ops
+	op -> !oplist add new-op -> error, requires hostmask
+	op -> !oplist add new-op <correct hostmask> -> success, new-op needs to set pass
+	new-op -> !setpass in PM with good pass -> success, pass set
+	new-op -> !login <pass> <#channel> in PM with good pass -> logged in, granted channel ops
+	op -> !oplist rm new-op -> success, new-op loses channel ops, retains account
+	op -> !oplist add new-op <correct hostmask> -> success
+	new-op -> !login <pass> <#channel> in PM with good pass -> logged in, granted channel ops
+	wait until nag timeout; ensure bot DOESN'T request ops
+	mode #channel -o bot
+	wait until nag timeout; ensure bot requests ops
+	end bot session; kill bot
+	
+	reset op nag timeout to production value (30 minutes at time of writing)
+
