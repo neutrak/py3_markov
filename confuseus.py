@@ -78,6 +78,9 @@ ignored_users=[]
 # }
 joined_channels={}
 
+seconds_bw_op_nag=1800 #30 minutes
+#seconds_bw_op_nag=60 #debug; 1 minute
+
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
 unit_conv_list=[]
@@ -884,6 +887,10 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist can only be used by channel operators; come back when you have ops',1)
 		return
 	
+	if(not (is_channel_operator(channel,bot_nick))):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist can only be used if this bot has channel operator permission; grant me ops first',1)
+		return
+	
 	args=line_post_cmd.split(' ')
 	
 	if(len(args)<2):
@@ -912,7 +919,7 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 		elif(len(user_results)>0):
 			pg_query='INSERT INTO user_channel_modes (nick,channel,mode_str) VALUES ($1,$2,$3)'
 			postgre_ret=db_handle.prepare(pg_query)
-			insert_result=pg_query(new_op_nick,channel,'o')
+			insert_result=postgre_ret(new_op_nick,channel,'o')
 			
 			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was successfully granted channel ops on '+channel,1)
 			
@@ -964,7 +971,7 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' on this channel',1)
 		
 		elif(len(user_results)>0):
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has accounts on other channels but not on channel '+channel,1)
+			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has an account registered with this bot but does not have channel ops on channel '+channel,1)
 		else:
 			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has no account registered with this bot',1)
 		
@@ -1442,7 +1449,8 @@ def handle_server_join(line):
 	if(not (channel in joined_channels)):
 		joined_channels[channel]={
 			'names':{},
-			'last_op_rqst':0
+			#give a 10 second delay on the first op request to give time for the NAMEs list (353) to come in
+			'last_op_rqst':(time.time()-max(seconds_bw_op_nag-10,0))
 		}
 	
 	#NOTE: the joining user might be ourselves, but that's fine
@@ -1451,7 +1459,7 @@ def handle_server_join(line):
 		'mode':''
 	}
 	
-	log_line('{JOIN} channel info is now '+json.dumps(joined_channels[channel])) #debug
+#	log_line('{JOIN} channel info is now '+str(joined_channels[channel])) #debug
 
 def handle_server_353(line):
 	global joined_channels
@@ -1483,7 +1491,7 @@ def handle_server_353(line):
 		}
 
 	
-	log_line('{353} channel info is now '+json.dumps(joined_channels[channel])) #debug
+#	log_line('{353} channel info is now '+str(joined_channels[channel])) #debug
 
 def handle_server_part(line):
 	global joined_channels
@@ -1504,10 +1512,12 @@ def handle_server_part(line):
 		if(nick in joined_channels[channel]['names']):
 			joined_channels[channel]['names'].pop(nick)
 	
+	'''
 	if(nick!=bot_nick):
-		log_line('{PART} channel info is now '+json.dumps(joined_channels[channel])) #debug
+		log_line('{PART} channel info is now '+str(joined_channels[channel])) #debug
 	else:
 		log_line('{PART} we left the channel, so there is no longer any channel info for it') #debug
+	'''
 
 def handle_server_quit(line):
 	global joined_channels
@@ -1525,7 +1535,7 @@ def handle_server_quit(line):
 		if(nick in joined_channels[channel]['names']):
 			joined_channels[channel]['names'].pop(nick)
 	
-	log_line('{QUIT} joined_channels='+json.dumps(joined_channels)) #debug
+#	log_line('{QUIT} joined_channels='+str(joined_channels)) #debug
 
 def handle_server_mode(sock,line):
 	global joined_channels
@@ -1545,6 +1555,43 @@ def handle_server_mode(sock,line):
 	#to get an updated list of what the modes ended up at after all was said and done
 	
 	py3queueln(sock,'NAMES '+channel,1)
+
+def run_periodic_op_rqst(sock):
+	global joined_channels
+	
+	db_handle=postgresql.open('pq://'+pg_user+':'+pg_passwd+'@localhost/'+pg_dbname)
+	pg_query='SELECT * FROM user_channel_modes'
+	postgre_ret=db_handle.prepare(pg_query)
+	user_channel_modes=postgre_ret()
+	db_handle.close()
+	
+	#add oplist-related handling here, specifically
+	#for each channel this bot is in
+	for channel in joined_channels:
+		for user_channel_mode in user_channel_modes:
+			# if there is at least one user authorized to have ops in this channel in the oplist_channels database table
+			if(user_channel_mode['channel']==channel):
+				# if this bot doesn't already have ops in that channel
+				if(joined_channels[channel]['names'][bot_nick]['mode'].find('o')<0):
+					seconds_since_last_op_nag=((time.time())-(joined_channels[channel]['last_op_rqst']))
+					# and it's been at least 30 minutes since this bot asked for OPs last
+					if(seconds_since_last_op_nag>=seconds_bw_op_nag):
+						# ping channel operators and ask them to grant OPs to the bot
+						ch_op_nicks=[]
+						for ch_user in joined_channels[channel]['names']:
+							if(joined_channels[channel]['names'][ch_user]['mode'].find('o')>=0):
+								ch_op_nicks.append(ch_user)
+						
+						if(len(ch_op_nicks)>0):
+							py3queueln(sock,'PRIVMSG '+channel+' :'+(' '.join(ch_op_nicks))+' - give me mode +o please',0)
+						
+						joined_channels[channel]['last_op_rqst']=time.time()
+				
+				#once we know we control the ops list for at least one user in this channel
+				#we can stop checking for what other users are authorized
+				#since we know that we need channel ops regardless
+				break
+
 
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
@@ -1621,12 +1668,8 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		succcesss,name,channel=get_token(line,' :')
 		py3queueln(sock,'JOIN :'+channel,1)
 	
-	#TODO: add oplist-related handling here, specifically
-	#for each channel this bot is in
-	#	if there is at least one user authorized to have ops in this channel in the oplist_channels database table
-	#		if this bot doesn't have ops in that channel
-	#			and it's been at least 30 minutes since this bot asked for OPs last
-	#			ping channel operators and ask them to grant OPs to the bot
+	#request ops as needed to make !oplist function correctly
+	run_periodic_op_rqst(sock)
 	
 	return (lines_since_write,lines_since_sort_chk)
 	
