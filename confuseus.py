@@ -1506,11 +1506,15 @@ def handle_server_part(line):
 	global joined_channels
 	
 	#:neu_tst!~neutrak@hostmask PART #bot-testing
+	#:neu_tst!~neutrak@hostmask PART #bot-testing :Message
 	
 	#get some information (user, nick, host, etc.)
 	line_info=parse_line_info(line)
 	nick=line_info['nick']
 	channel=line_info['content']
+	if(line_info['content'].find(' ')>=0):
+		success,channel,part_msg=get_token(line_info['content'],' ')
+		part_msg=part_msg.lstrip(':')
 	
 	#if it was us leaving the channel
 	#then remove the entire joined channels entry for this channel
