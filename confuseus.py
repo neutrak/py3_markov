@@ -1602,9 +1602,6 @@ def run_periodic_op_rqst(sock):
 def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines_since_sort_chk):
 	global bot_nick
 	global joined_channels
-
-	#request ops as needed to make !oplist function correctly
-	run_periodic_op_rqst(sock)
 	
 	#ignore blank lines
 	if(line==''):
@@ -1615,6 +1612,9 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 		success,ping,msg=get_token(line,' :')
 		if(success):
 			py3queueln(sock,'PONG :'+msg,0)
+
+		#request ops as needed to make !oplist function correctly
+		run_periodic_op_rqst(sock)
 		return (lines_since_write,lines_since_sort_chk)
 	#error, so exit
 	elif(line.startswith('ERROR')):
@@ -1627,6 +1627,12 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	#verbose debug
 	if(server_cmd!='PRIVMSG'):
 		log_line(server_name+' '+server_cmd+' '+line)
+	
+	#if this line isn't itself a mode change
+	#(because if it is a mode change it might be the line that is currently giving us OPs)
+	if(server_cmd!='MODE'):
+		#request ops as needed to make !oplist function correctly
+		run_periodic_op_rqst(sock)
 	
 	#hello message received, so auto-join
 	if(server_cmd=='001'):
