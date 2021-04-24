@@ -620,14 +620,56 @@ def read_state_change_from_file(filename):
 	
 	return state_change
 
+def state_sql_import(db_login,state_file):
+	print('using file '+state_file+' for state file to import')
+	state_change=read_state_change_from_file(state_file)
+	
+	db_handle=pg_connect(db_login)
+	
+	#for each transition in the state file
+	for state_transition in state_change:
+		#get the info out of it
+		prefix=state_transition.prefix
+		suffix=state_transition.suffix
+		state_count=state_transition.count
+		pg_state_count=0
+		
+		is_update=False
+		
+		#see if it already exists in postgres
+		success,results=pg_search(db_handle=db_handle,db_login=db_login,prefix=prefix,suffix=suffix)
+		if(success):
+			#if so, this is an update operation, not an insert
+			#and we add the existing count to that from the state file
+			is_update=True
+			for pg_state_transition in results:
+				pg_state_count+=pg_state_transition.count
+			state_count+=pg_state_count
+		
+		if(is_update):
+			print('Updating existing transition '+(' '.join(prefix))+' => '+suffix+' to have count '+str(state_count)+' in place of '+str(pg_state_count))
+			pg_update(db_handle=db_handle,db_login=db_login,prefix=prefix,suffix=suffix,count=state_count)
+		else:
+			print('Inserting new transition '+(' '.join(prefix))+' => '+suffix+' with count '+str(state_count))
+			pg_insert(db_handle=db_handle,db_login=db_login,prefix=prefix,suffix=suffix,count=state_count)
+	
+	print('Import completed successfully.')
+	db_handle.close()
+	return True
+
 
 if(__name__=='__main__'):
 	print('py3_markov version '+VERSION)
+	
+	run_state_pgsql_import=False
 	
 	config_file=config.dflt_cfg
 	if(len(sys.argv)>1):
 		config_file=sys.argv[1]
 	print('using JSON config file '+config_file)
+	if(len(sys.argv)>2):
+		if(sys.argv[2]=='--import-state-file-to-pgsql'):
+			run_state_pgsql_import=True
 	
 	#the state transition array structure,
 	#which contains prefixes, suffixes, and probabilities associated with each suffix
@@ -670,6 +712,23 @@ if(__name__=='__main__'):
 		else:
 			db_login=db_info(pg_user,pg_passwd,pg_dbname)
 			print('using postgres database '+db_login.db_name+' for input and output of state changes')
+	
+	if(run_state_pgsql_import):
+		print('running state->postgresql db importer...')
+		print('if states already exist in postgresql, their counts will be updated based on state file information')
+		print('if your state file is too large, this will run out of RAM and crash; sorry!')
+		if(not (use_pg)):
+			print('Err: use_pg must be true in config for this to work')
+			sys.exit(1)
+			
+		state_file=config.get_json_param(config.read_json_file(config_file),'state_file')
+		if(state_file is None):
+			print('Err: State file not configured; state file configuration must be present in config')
+			sys.exit(1)
+		
+		state_sql_import(db_login=db_login,state_file=state_file)
+		
+		sys.exit(0)
 	
 	print('reading from stdin...')
 	
