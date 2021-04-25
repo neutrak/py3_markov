@@ -62,6 +62,20 @@ ignored_users=[]
 
 #END JSON-configurable globals ==========================================================
 
+#the tell queue is a list of messages that are meant to be sent to a particular user in a particular channel
+#along with meta information like who sent it and when
+tell_queue=[]
+
+#this is a single message that one user !tells another user
+#and is meant to be a single entry in the global tell_queue list
+class tell_msg:
+	def __init__(self,time_sent,sender,nick,channel,content):
+		self.time_sent=time_sent
+		self.sender=sender
+		self.nick=nick
+		self.channel=channel
+		self.content=content
+
 #a list of channels this bot is currently in, which includes user information
 #each channel entry is expected to be structured as follows (note that channel names and nicks are globally unique):
 #channel: {
@@ -386,6 +400,18 @@ def parse_line_info(line):
 		'content':line,
 	}
 
+def send_tell_queue_msgs(sock,channel,nick):
+	global tell_queue
+
+	new_tell_queue=[]
+	for tell_entry in tell_queue:
+		if(nick==tell_entry.nick):
+			py3queueln(sock,'PRIVMSG '+channel+' :['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
+		else:
+			new_tell_queue.append(tell_entry)
+	
+	tell_queue=new_tell_queue
+
 #handle conversions (stored in a generic unit_conv list)
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
 	global unit_conv_list
@@ -675,7 +701,7 @@ def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+err_msg)
 
 #display an example of the given command
-def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login):
+def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
 	if(line_post_cmd==''):
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: Missing argument (the command); see '+cmd_esc+'help for a command list',1)
 	elif(line_post_cmd==(cmd_esc+'wut')):
@@ -723,6 +749,9 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_chang
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'oplist','add neutrak',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'login')) or (line_post_cmd==(cmd_esc+'setpass'))):
 		py3queueln(sock,'PRIVMSG '+channel+' :Warn: command '+line_post_cmd+' is only valid in PM and contains sensitive information, so it does not have an example listed here',1)
+	elif(line_post_cmd==(cmd_esc+'tell')):
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'tell '+nick+' Hello')
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'tell',nick+' Hello',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
 		py3queueln(sock,'PRIVMSG '+channel+' :Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
 	else:
@@ -759,6 +788,7 @@ def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oplist <add|rm|check> <user> [hostmask] -> allows channel operators to authorize/register other channel operators in a way that will persist between reconnections',3)
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'login <pass> [channel]                  -> [PM ONLY] if you are an authorized channel operator, logs you in to that channel',3)
 		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'setpass <pass> [oldpass]                -> [PM ONLY] sets a password for your channel operator account, if you have been invited to become a channel operator; if you have already set a password oldpass is required for authorization',3)
+		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'tell <nick> <message>                   -> leaves a message for a user the next time they join this channel (not stored on disk; if the bot disconnects your message is lost)',3)
 		for conversion in unit_conv_list:
 			help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
 			while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')):
@@ -1108,6 +1138,28 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 	
 	db_handle.close()
 
+def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login):
+	import datetime
+	global tell_queue
+	
+	if(is_pm):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: This is a PM.  This only works in a channel; messages are sent the next time the user joins that channel.  ')
+		return False
+	
+	from_nick=nick
+	success,to_nick,content=get_token(line_post_cmd,' ')
+	if(not success):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: Wrong argument structure; Usage: '+cmd_esc+'tell <nick> <message>')
+		return False
+	
+	if(to_nick in joined_channels[channel]['names']):
+		py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
+		return False
+	
+	utc_now_str=datetime.datetime.utcnow().isoformat()
+	tell_queue.append(tell_msg(utc_now_str,from_nick,to_nick,channel,content))
+	py3queueln(sock,'PRIVMSG '+channel+' :Message stored.  I will tell them your message the next time they join '+channel)
+	return True
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
 	global gen_cmd
@@ -1144,7 +1196,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
 		handled=True
 	elif(cmd==(cmd_esc+'example')):
-		handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,state_change,use_pg,db_login)
+		handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 		handled=True
 	elif(cmd==(cmd_esc+'dbg') or cmd==(cmd_esc+'debug')):
 		#set debug channel ON if authorized
@@ -1306,6 +1358,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	elif(cmd==(cmd_esc+'setpass')):
 		handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
 		handled=True
+	#tell -> leave a message for a user the next time they re-join this channel
+	elif(cmd==(cmd_esc+'tell')):
+		handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
+		handle=True
 	elif(cmd.startswith(cmd_esc)):
 		try:
 			#alternate conversion syntax
@@ -1446,7 +1502,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	return (lines_since_write,lines_since_sort_chk)
 
 #handle a join command that was sent by the server
-def handle_server_join(line):
+def handle_server_join(sock,line):
 	global bot_nick
 	global joined_channels
 	
@@ -1471,8 +1527,12 @@ def handle_server_join(line):
 	joined_channels[channel]['names'][nick]={
 		'mode':''
 	}
+	
+	#if there are any !tells queued up for this user and channel,
+	#send them now
+	send_tell_queue_msgs(sock=sock,channel=channel,nick=nick)
 
-def handle_server_353(line):
+def handle_server_353(sock,line):
 	global joined_channels
 	
 	#confuseus @ #faid3.0 :confuseus mz Spock @neutrak
@@ -1500,6 +1560,8 @@ def handle_server_353(line):
 		joined_channels[channel]['names'][nick_sans_mode]={
 			'mode':mode_str
 		}
+		
+		send_tell_queue_msgs(sock=sock,channel=channel,nick=nick_sans_mode)
 
 
 def handle_server_part(line):
@@ -1645,12 +1707,12 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	#create the channel structure if it doesn't already exist (in case we were doing the joining)
 	#if someone other than us was doing the joining, add them to the names list for this channel
 	elif(server_cmd=='JOIN'):
-		handle_server_join(full_line)
+		handle_server_join(sock,full_line)
 	#handle 353 names list, joins, and quits, to get a list of users for each channel we're in
 	#which includes channel operator information
 	#as channel operator information is necessary for oplist handling
 	elif(server_cmd=='353'):
-		handle_server_353(line)
+		handle_server_353(sock,line)
 	#on PART and QUIT, remove the user from the appropriate channel information
 	#since they are no longer present
 	elif(server_cmd=='PART'):
