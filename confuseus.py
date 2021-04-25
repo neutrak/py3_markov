@@ -1692,7 +1692,8 @@ def handle_server_line(sock,line,state_change,state_file,lines_since_write,lines
 	
 	#if this line isn't itself a mode change
 	#(because if it is a mode change it might be the line that is currently giving us OPs)
-	if(server_cmd!='MODE'):
+	#NOTE: because after every mode change we re-request a names list, also ignore responses from that
+	if(not (server_cmd in ['MODE','353','366'])):
 		#request ops as needed to make !oplist function correctly
 		run_periodic_op_rqst(sock)
 	
