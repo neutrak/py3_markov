@@ -3,6 +3,7 @@ gcide-0.51
 log.txt
 *_log_*.txt
 *state_file.txt
+confuseus_cfg_dev.json
 .*.swp
 .swp
 

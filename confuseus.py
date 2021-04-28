@@ -405,7 +405,8 @@ def send_tell_queue_msgs(sock,channel,nick):
 
 	new_tell_queue=[]
 	for tell_entry in tell_queue:
-		if(nick==tell_entry.nick):
+		#NOTE: nicknames are considered case-insensitive for the purpose of !tell
+		if(nick.lower()==tell_entry.nick.lower()):
 			py3queueln(sock,'PRIVMSG '+channel+' :['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
 		else:
 			new_tell_queue.append(tell_entry)
