@@ -92,7 +92,8 @@ class tell_msg:
 # }
 joined_channels={}
 
-seconds_bw_op_nag=1800 #30 minutes
+seconds_bw_op_nag=14400 #4 hours
+#seconds_bw_op_nag=1800 #30 minutes
 #seconds_bw_op_nag=60 #debug; 1 minute
 #seconds_bw_op_nag=300 #debug; 5 minutes
 
