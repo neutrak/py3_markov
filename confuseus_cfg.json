@@ -1,4 +1,5 @@
 {
+	"cmd_esc":"!",
 	"bot_nick":"confuseus",
 	"host":"ssl.irc.atw-inter.net",
 	"port":6697,
