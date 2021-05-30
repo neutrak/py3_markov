@@ -24,7 +24,7 @@ class db_info:
 		self.passwd=passwd
 		self.db_name=db_name
 
-VERSION='0.1.0'
+VERSION='1.0.0'
 
 #get the next token out of the given text
 def next_token(text):
@@ -180,7 +180,7 @@ def pg_connect(db_login):
 def pg_run_query(db_login,pg_query,pg_params):
 	db_handle=pg_connect(db_login)
 	postgre_ret=db_handle.prepare(pg_query)
-	results=postgre_ret(pg_params)
+	results=postgre_ret(*pg_params)
 	db_handle.close()
 	
 	return results

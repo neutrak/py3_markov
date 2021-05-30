@@ -44,3 +44,21 @@ CREATE TABLE IF NOT EXISTS user_channel_modes(
 	PRIMARY KEY (channel,nick,mode_str)
 );
 
+--a table of tell queue messages
+CREATE TABLE IF NOT EXISTS tell_msg(
+	--when this message was stored, in ISO8601 format
+	time_sent VARCHAR(64) NOT NULL,
+	
+	--who sent it
+	sender VARCHAR(256) NOT NULL,
+	
+	--who is to receive it
+	nick VARCHAR(256) NOT NULL,
+	
+	--in which channel the message should be shown
+	channel VARCHAR(256) NOT NULL,
+	
+	--the text content of the message itself
+	content VARCHAR(256) NOT NULL
+);
+

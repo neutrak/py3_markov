@@ -63,7 +63,9 @@ ignored_users=[]
 
 #END JSON-configurable globals ==========================================================
 
-#TODO: move the tell queue to the postgres database so it persists when the bot is restarted
+#NOTE: if use_pg is true this in-memory tell queue isn't used
+#and instead messages are stored in the tell_msg table in the postgres database
+#and they persist on restart
 
 #the tell queue is a list of messages that are meant to be sent to a particular user in a particular channel
 #along with meta information like who sent it and when
@@ -433,22 +435,30 @@ def parse_line_info(line):
 		'content':line,
 	}
 
+#TODO: update ALL py3queueln('PRIVMSG '...) calls to use this pm function instead
 #send a PRIVMSG to the server
 def pm(sock,channel,msg,priority=1):
 	py3queueln(s=sock,message='PRIVMSG '+channel+' :'+msg,priority=priority)
 
 def send_tell_queue_msgs(sock,channel,nick):
-	global tell_queue
-
-	new_tell_queue=[]
-	for tell_entry in tell_queue:
-		#NOTE: nicknames are considered case-insensitive for the purpose of !tell
-		if(nick.lower()==tell_entry.nick.lower()):
-			pm(sock,channel,'['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
-		else:
-			new_tell_queue.append(tell_entry)
-	
-	tell_queue=new_tell_queue
+	if(use_pg):
+		tell_queue_msgs=markov.pg_run_query(db_login,'SELECT * FROM tell_msg WHERE LOWER(channel)=$1 AND LOWER(nick)=$2',(channel.lower(),nick.lower()))
+		if(len(tell_queue_msgs)>0):
+			for tell_entry in tell_queue_msgs:
+				pm(sock,channel,'['+str(tell_entry['time_sent'])+'] <'+tell_entry['sender']+'> '+tell_entry['nick']+': '+tell_entry['content'],1)
+		markov.pg_run_query(db_login,'DELETE FROM tell_msg WHERE LOWER(channel)=$1 AND LOWER(nick)=$2',(channel.lower(),nick.lower()))
+	else:
+		global tell_queue
+		
+		new_tell_queue=[]
+		for tell_entry in tell_queue:
+			#NOTE: nicknames are considered case-insensitive for the purpose of !tell
+			if(nick.lower()==tell_entry.nick.lower()):
+				pm(sock,channel,'['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
+			else:
+				new_tell_queue.append(tell_entry)
+		
+		tell_queue=new_tell_queue
 
 #handle conversions (stored in a generic unit_conv list)
 def handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel):
@@ -1204,14 +1214,21 @@ def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_p
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: Wrong argument structure; Usage: '+cmd_esc+'tell <nick> <message>')
 		return False
 	
-	for ch_nick in joined_channels[channel]['names']:
-		if(to_nick.lower()==ch_nick.lower()):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
-			return False
+#	for ch_nick in joined_channels[channel]['names']:
+#		if(to_nick.lower()==ch_nick.lower()):
+#			py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
+#			return False
 	
-	utc_now_str=datetime.datetime.utcnow().isoformat()
-	tell_queue.append(tell_msg(utc_now_str,from_nick,to_nick,channel,content))
+	utc_now=datetime.datetime.utcnow()
+	utc_now-=datetime.timedelta(microseconds=utc_now.microsecond)
+	utc_now_str=utc_now.isoformat()
+	if(use_pg):
+		markov.pg_run_query(db_login,'INSERT INTO tell_msg (time_sent,sender,nick,channel,content) VALUES ($1,$2,$3,$4,$5)',(utc_now_str,from_nick,to_nick,channel,content))
+	else:
+		tell_queue.append(tell_msg(utc_now_str,from_nick,to_nick,channel,content))
+	
 	py3queueln(sock,'PRIVMSG '+channel+' :Message stored.  I will tell them your message the next time they join '+channel)
+	
 	return True
 
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
@@ -1414,7 +1431,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	#so that this can be a full replacement for all the commonly-used functionality that tard used to provide
 	elif(cmd==(cmd_esc+'tell')):
 		handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
-		handle=True
+		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		try:
 			#alternate conversion syntax
@@ -2020,6 +2037,15 @@ if(__name__=='__main__'):
 		else:
 			db_login=markov.db_info(pg_user,pg_passwd,pg_dbname)
 			print('using postgres database '+db_login.db_name+' for input and output of state changes')
+
+		#run the markov.sql file on this database to ensure all tables are set up correctly
+		#just in case any don't already exist
+		db_handle=markov.pg_connect(db_login)
+		db_handle.execute(open('markov.sql','r').read())
+		db_handle.close()
+		
+		#update tell helptext since with postgres messages actually will persist on restart
+		cmd_helptext['tell <nick> <message>']='leaves a message for a user the next time they join this channel'
 	
 	main(config.get_json_param(config.read_json_file(config_file),'state_file'),use_ssl=use_ssl)
 
