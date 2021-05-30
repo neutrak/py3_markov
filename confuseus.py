@@ -1214,10 +1214,10 @@ def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_p
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: Wrong argument structure; Usage: '+cmd_esc+'tell <nick> <message>')
 		return False
 	
-#	for ch_nick in joined_channels[channel]['names']:
-#		if(to_nick.lower()==ch_nick.lower()):
-#			py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
-#			return False
+	for ch_nick in joined_channels[channel]['names']:
+		if(to_nick.lower()==ch_nick.lower()):
+			py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
+			return False
 	
 	utc_now=datetime.datetime.utcnow()
 	utc_now-=datetime.timedelta(microseconds=utc_now.microsecond)
