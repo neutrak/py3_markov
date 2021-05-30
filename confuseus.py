@@ -41,6 +41,7 @@ dbg_hist_max=3
 
 #BEGIN JSON-configurable globals ========================================================
 
+cmd_esc='!'
 bot_nick='confuseus'
 autojoin_channels=[]
 dbg_channels=[]
@@ -61,6 +62,8 @@ authed_users=[]
 ignored_users=[]
 
 #END JSON-configurable globals ==========================================================
+
+#TODO: move the tell queue to the postgres database so it persists when the bot is restarted
 
 #the tell queue is a list of messages that are meant to be sent to a particular user in a particular channel
 #along with meta information like who sent it and when
@@ -96,6 +99,29 @@ seconds_bw_op_nag=14400 #4 hours
 #seconds_bw_op_nag=1800 #30 minutes
 #seconds_bw_op_nag=60 #debug; 1 minute
 #seconds_bw_op_nag=300 #debug; 5 minutes
+
+cmd_helptext={
+	'wut':'generate text based on markov chains',
+	'example <command>':'display an example of a command and its output',
+	'dbg <always|never|#>':'enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',
+	'help [command]':'if used in PM with no arguments shows a command list; if a command is given help text will be displayed only for that command',
+	'shup [min nice lvl]':'clears low-priority messages from sending queue (authorized users can clear higher priority messages)',
+	'part':'parts current channel (you can invite to me get back)',
+	'wiki <topic>':'grabs topic summary from wikipedia',
+	'define <word>':'checks definintion of word in gcide dictionary',
+	'source':'links the github url for this bot\'s source code',
+	'omdb <movie name>':'grabs movie information from the open movie database',
+	'splchk <word> [edit dist]':'checks given word against a dictionary and suggests fixes',
+	'dieroll [sides]':'generates random number in range [1,sides]',
+	'time [utc offset tz]':'tells current UTC time, or if a timezone is given, current time in that timezone',
+	'timecalc <%R> <tz1> <tz2>':'tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',
+	'seen-quit <nick>':'checks log files for last time when given nick was seen quitting (does NOT check if they\'re currently here)',
+	'oplist <add|rm|check> <user> [hostmask]':'allows channel operators to authorize/register other channel operators in a way that will persist between reconnections',
+	#!login and !setpass documentation should include password requirement information
+	'login <pass> [channel]':'[PM ONLY] if you are an authorized channel operator, logs you in to that channel; passphrases must be at least 10 characters and contain no spaces; there are no other requirements',
+	'setpass <pass> [oldpass]':'[PM ONLY] sets a password for your channel operator account, if you have been invited to become a channel operator; if you have already set a password oldpass is required for authorization',
+	'tell <nick> <message>':'leaves a message for a user the next time they join this channel (not stored on disk; if the bot disconnects your message is lost)',
+}
 
 #a list of all unit conversions we currently support
 #this will be populated as the conversion functions get defined
@@ -229,6 +255,12 @@ def li_to_oz(li):
 	return li/oz_to_li(1)
 
 unit_conv_list.append(unit_conv('volume','l','liters','oz','fluid ounces',li_to_oz))
+
+#add generated help text for unit-conv messages
+for conversion in unit_conv_list:
+	conversion_cmd=conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
+	help_str='converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
+	cmd_helptext[conversion_cmd]=help_str
 
 #determine if the given text is an odd number of question marks
 def odd_quest(txt):
@@ -401,6 +433,10 @@ def parse_line_info(line):
 		'content':line,
 	}
 
+#send a PRIVMSG to the server
+def pm(sock,channel,msg,priority=1):
+	py3queueln(s=sock,message='PRIVMSG '+channel+' :'+msg,priority=priority)
+
 def send_tell_queue_msgs(sock,channel,nick):
 	global tell_queue
 
@@ -408,7 +444,7 @@ def send_tell_queue_msgs(sock,channel,nick):
 	for tell_entry in tell_queue:
 		#NOTE: nicknames are considered case-insensitive for the purpose of !tell
 		if(nick.lower()==tell_entry.nick.lower()):
-			py3queueln(sock,'PRIVMSG '+channel+' :['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
+			pm(sock,channel,'['+str(tell_entry.time_sent)+'] <'+tell_entry.sender+'> '+tell_entry.nick+': '+tell_entry.content,1)
 		else:
 			new_tell_queue.append(tell_entry)
 	
@@ -704,6 +740,9 @@ def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 
 #display an example of the given command
 def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
+	if((len(line_post_cmd)>0) and (not line_post_cmd.startswith(cmd_esc))):
+		line_post_cmd=cmd_esc+line_post_cmd
+	
 	if(line_post_cmd==''):
 		py3queueln(sock,'PRIVMSG '+channel+' :Err: Missing argument (the command); see '+cmd_esc+'help for a command list',1)
 	elif(line_post_cmd==(cmd_esc+'wut')):
@@ -768,38 +807,49 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 
 def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	global unit_conv_list
+	global cmd_helptext
+
+	if((len(line_post_cmd)>0) and (not line_post_cmd.startswith(cmd_esc))):
+		line_post_cmd=cmd_esc+line_post_cmd
 	
-	if(is_pm):
-		py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut                                     -> generate text based on markov chains',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example <command>                       -> display an example of a command and its output',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg <always|never|#>                    -> enable/disable/show debug info about markov text generation (authorized uses can enable or disable, any users can get history)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'help                                    -> displays this command list',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup [min nice lvl]                     -> clears low-priority messages from sending queue (authorized users can clear higher priority messages)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'part                                    -> parts current channel (you can invite to me get back)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc <expression>                       -> simple calculator; supports +,-,*,/,and ^; uses rpn internally',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki <topic>                            -> grabs topic summary from wikipedia',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define <word>                           -> checks definintion of word in gcide dictionary',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'source                                  -> links the github url for this bot\'s source code',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb <movie name>                       -> grabs movie information from the open movie database',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk <word> [edit dist]               -> checks given word against a dictionary and suggests fixes',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll [sides]                         -> generates random number in range [1,sides]',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time [utc offset tz]                    -> tells current UTC time, or if a timezone is given, current time in that timezone',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc <%R> <tz1> <tz2>               -> tells what the given time (%R == hours:minutes on a 24-hour clock) at the first utc-offset timezone will be at the second utc-offset timezone',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit <nick>                        -> checks log files for last time when given nick was seen quitting (does NOT check if they\'re currently here)',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oplist <add|rm|check> <user> [hostmask] -> allows channel operators to authorize/register other channel operators in a way that will persist between reconnections',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'login <pass> [channel]                  -> [PM ONLY] if you are an authorized channel operator, logs you in to that channel',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'setpass <pass> [oldpass]                -> [PM ONLY] sets a password for your channel operator account, if you have been invited to become a channel operator; if you have already set a password oldpass is required for authorization',3)
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'tell <nick> <message>                   -> leaves a message for a user the next time they join this channel (not stored on disk; if the bot disconnects your message is lost)',3)
-		for conversion in unit_conv_list:
-			help_str='PRIVMSG '+channel+' :'+cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
-			while(len(help_str)<len('PRIVMSG '+channel+' :'+cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')):
-				help_str+=' '
-			help_str+='-> converts '+conversion.dimension+' from '+conversion.from_disp+' to '+conversion.to_disp
-			py3queueln(sock,help_str,3)
-	else:
-		py3queueln(sock,'PRIVMSG '+channel+' :This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help',3)
-			
+	help_cmd=line_post_cmd.split(' ')[0]
+	help_cmd_exists=len(help_cmd)>0
+	found_help_cmd=False
+	
+	if((is_pm) and (not help_cmd_exists)):
+		pm(sock,channel,'This is a simple markov chain bot',3)
+	
+	#display all help text for every command in a big long list
+	#if an argument is given, only help for that text will be shown
+	for cmd_w_args in cmd_helptext:
+		cmd=cmd_w_args.split(' ')[0]
+
+		#accept /(cmd_esc)?(command)/ as an argument
+		#and if given only output the help text for that single command
+		#instead of everything in a big long list
+		
+		#if no argument was given
+		if((not help_cmd_exists) or (help_cmd==cmd_esc+cmd)):
+			if(is_pm or help_cmd_exists):
+				help_str=cmd_esc+cmd_w_args
+				while(len(help_str)<len(cmd_esc+'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')):
+					help_str+=' '
+				help_str+='-> '+cmd_helptext[cmd_w_args]
+				pm(sock,channel,help_str,3)
+
+		#if a command parameter was given
+		#only output the help text for that single command
+		#instead of everything in a big long list
+		if(help_cmd_exists and (help_cmd==cmd_esc+cmd)):
+			found_help_cmd=True
+			break
+	
+	if(help_cmd_exists and (not found_help_cmd)):
+		pm(sock,channel,'Err: Unrecognzied command '+help_cmd+'; you can send !help in PM to get a full command list')
+	
+	if((not is_pm) and (not help_cmd_exists)):
+		pm(sock,channel,'This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help; !help !command for detailed information about a particular command',3)
+	
 
 #check when a user was last seen
 def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt'):
@@ -1345,8 +1395,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	#TODO: add weather forecast via darksky or yahoo weather or http://weather.gc.ca/canada_e.html (for Canada)
-	#TODO: add !tell and !seen commands once oplist-related commands are complete
-	#so that this can be a full replacement for all the commonly-used functionality that tard used to provide
+	#TODO: add a proper !seen command that shows the last time a user was online (the last QUIT or latest log we have if they are not currently online)
 	elif(cmd==(cmd_esc+'seen-quit')):
 		handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
@@ -1362,6 +1411,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
 		handled=True
 	#tell -> leave a message for a user the next time they re-join this channel
+	#so that this can be a full replacement for all the commonly-used functionality that tard used to provide
 	elif(cmd==(cmd_esc+'tell')):
 		handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
 		handle=True
@@ -1889,6 +1939,11 @@ if(__name__=='__main__'):
 	
 	#set configuration from the config file
 	#if configuration for anything is omitted a default value from the code is used
+	
+	#command escape
+	json_cmd_esc=config.get_json_param(json_cfg_tree,'cmd_esc')
+	if(json_cmd_esc!=None):
+		cmd_esc=json_cmd_esc
 	
 	#nick
 	json_bot_nick=config.get_json_param(json_cfg_tree,'bot_nick')
