@@ -36,7 +36,7 @@ dbg_hist=[]
 #a max, after which to rotate debug history
 dbg_hist_max=3
 
-#NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, authed_users, and ignored_users
+#NOTE: bot_nick, autojoin_channels, dbg_channels, host, port, ssl, shup_authed_users, and ignored_users
 #are specified by the json config file; these are just defaults if values are not configured there
 
 #BEGIN JSON-configurable globals ========================================================
@@ -54,8 +54,7 @@ qa_sets=[]
 
 #users allowed to !shup the bot
 #(aka clear outgoing queue)
-#TODO: replace authed_users with database-stored oplist user accounts for shup and debug command, etc.
-authed_users=[]
+shup_authed_users=[]
 
 #users to ignore (bots)
 #this is a blacklist, like /ignore in many clients
@@ -1270,14 +1269,14 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	elif(cmd==(cmd_esc+'dbg') or cmd==(cmd_esc+'debug')):
 		#set debug channel ON if authorized
 		if(line_post_cmd=='always'):
-			if(nick in authed_users):
+			if(nick in shup_authed_users):
 				dbg_state='always'
 				pm(sock,channel,'Info: Now outputting debug messages in '+(','.join(dbg_channels))+' without being asked',1)
 			else:
 				pm(sock,channel,'Err: You are not authorized to change debug settings',1)
 		#set debug channel OFF if authorized
 		elif(line_post_cmd=='never'):
-			if(nick in authed_users):
+			if(nick in shup_authed_users):
 				dbg_state='never'
 				pm(sock,channel,'Info: No longer outputting debug messages without being asked',1)
 			else:
@@ -1322,7 +1321,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			nice_lvl=4
 		
 		#authorized users can suppress high-priority output
-		if(nick in authed_users):
+		if(nick in shup_authed_users):
 			nice_lvl=max(nice_lvl,1)
 		#unauthorized users can only suppress low-priority output
 		else:
@@ -1993,9 +1992,9 @@ if(__name__=='__main__'):
 		gen_cmd=json_gen_cmd
 	
 	#specially-handled user lists
-	json_authed_users=config.get_json_param(json_cfg_tree,'authed_users')
-	if(json_authed_users!=None):
-		authed_users=json_authed_users
+	json_shup_authed_users=config.get_json_param(json_cfg_tree,'shup_authed_users')
+	if(json_shup_authed_users!=None):
+		shup_authed_users=json_shup_authed_users
 	json_ignored_users=config.get_json_param(json_cfg_tree,'ignored_users')
 	if(json_ignored_users!=None):
 		ignored_users=json_ignored_users
