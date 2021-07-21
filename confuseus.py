@@ -151,9 +151,9 @@ class unit_conv:
 		try:
 			from_val=float(line_post_cmd)
 			to_val=self.conv_func(from_val)
-			py3queueln(sock,'PRIVMSG '+channel+' :'+round_nstr(from_val)+' '+self.from_disp+' is '+round_nstr(to_val)+' '+self.to_disp,1)
+			pm(sock,channel,''+round_nstr(from_val)+' '+self.from_disp+' is '+round_nstr(to_val)+' '+self.to_disp,1)
 		except ValueError:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: '+self.from_abbr+'->'+self.to_abbr+' requires a number, but I couldn\'t find one in your argument',1)
+			pm(sock,channel,'Err: '+self.from_abbr+'->'+self.to_abbr+' requires a number, but I couldn\'t find one in your argument',1)
 
 #get a token from the given text, where token ends on the first instance of the substring delimiter
 def get_token(text,delimiter):
@@ -320,9 +320,9 @@ def dbg_output(sock,dbg_str):
 		for chan in dbg_channels:
 			for line in dbg_str.split("\n"):
 				if(line!=''):
-					py3queueln(sock,'PRIVMSG '+chan+' :'+line[0:MAX_IRC_LINE_LEN-80],4)
+					pm(sock,chan,line[0:MAX_IRC_LINE_LEN-80],4)
 					if(len(line[MAX_IRC_LINE_LEN-80:])>0):
-						py3queueln(sock,'PRIVMSG '+chan+' :'+line[MAX_IRC_LINE_LEN-80:],4)
+						pm(sock,chan,line[MAX_IRC_LINE_LEN-80:],4)
 #					time.sleep(random.uniform(0.1,1.5))
 
 #this gets the definition of a word out of the given dictionary
@@ -435,7 +435,6 @@ def parse_line_info(line):
 		'content':line,
 	}
 
-#TODO: update ALL py3queueln('PRIVMSG '...) calls to use this pm function instead
 #send a PRIVMSG to the server
 def pm(sock,channel,msg,priority=1):
 	py3queueln(s=sock,message='PRIVMSG '+channel+' :'+msg,priority=priority)
@@ -483,17 +482,17 @@ def handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		try:
 			response=http_cat.get_page(url)
 		except:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not retrieve data (weird characters in title?)',1)
+			pm(sock,channel,'Err: Could not retrieve data (weird characters in title?)',1)
 			return
 		
 		response_type=response[0].split("\n")[0].rstrip("\r")
 		if(response_type.find('200 OK')<0):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
+			pm(sock,channel,'Err: \"'+response_type+'\"',1)
 		else:
 			try:
 				json_tree=json.loads(response[1])
 			except ValueError:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse json response from omdb',1)
+				pm(sock,channel,'Err: Could not parse json response from omdb',1)
 				return
 			
 			#movie information now that retrieval is done
@@ -511,11 +510,11 @@ def handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 			plot='' if plot==None else plot
 			
 			if((title=='') and (rating=='') and (year=='') and (genre=='') and (plot=='')):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: No information (movie might not be in omdb, or might not exist)',1)
+				pm(sock,channel,'Err: No information (movie might not be in omdb, or might not exist)',1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :'+title+' / '+rating+' / '+year+' / '+genre+' / '+plot,1)
+				pm(sock,channel,title+' / '+rating+' / '+year+' / '+genre+' / '+plot,1)
 	else:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: omdb requires a movie title as a parameter',1)
+		pm(sock,channel,'Err: omdb requires a movie title as a parameter',1)
 
 
 #handle a spellcheck command
@@ -574,14 +573,14 @@ def handle_spellcheck(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 			if(fix_word_cnt>=max_fix_words):
 				spellcheck_output+=', ...'
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :'+spellcheck_output,1)
+		pm(sock,channel,spellcheck_output,1)
 		
 		words_on_line+=1
 
 def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	arguments=line_post_cmd.split(' ')
 	if(len(arguments)<3):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Too few arguments given to '+cmd_esc+'timecalc command; Usage: '+cmd_esc+'timecalc <%R> <tz1> <tz2>',1)
+		pm(sock,channel,'Err: Too few arguments given to '+cmd_esc+'timecalc command; Usage: '+cmd_esc+'timecalc <%R> <tz1> <tz2>',1)
 		return
 	
 	#parse out %R
@@ -609,7 +608,7 @@ def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		valid_time=False
 	
 	if(not valid_time):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Invalid time given; syntax is <hours>:<minutes> where 0<=hours<=23, 0<=minutes<=59',1)
+		pm(sock,channel,'Err: Invalid time given; syntax is <hours>:<minutes> where 0<=hours<=23, 0<=minutes<=59',1)
 		return
 	
 	#save off the given time so we can manipulate the hours and minutes to calculate for the second timezone
@@ -635,7 +634,7 @@ def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 		valid_time=False
 	
 	if(not valid_time):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Invalid timezone(s) given; should be an integer value representing UTC offset',1)
+		pm(sock,channel,'Err: Invalid timezone(s) given; should be an integer value representing UTC offset',1)
 		return
 	
 	#if we got here then we have a valid time, and 2 valid timezones
@@ -666,7 +665,7 @@ def handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	if(len(minutes_str)<2):
 		minutes_str='0'+minutes_str
 	
-	py3queueln(sock,'PRIVMSG '+channel+' :'+given_hours_str+':'+given_minutes_str+' at UTC '+tz_1_str+' is '+hours_str+':'+minutes_str+(' the next day' if day_diff>0 else (' the previous day' if day_diff<0 else ''))+' at UTC '+tz_2_str,1)
+	pm(sock,channel,''+given_hours_str+':'+given_minutes_str+' at UTC '+tz_1_str+' is '+hours_str+':'+minutes_str+(' the next day' if day_diff>0 else (' the previous day' if day_diff<0 else ''))+' at UTC '+tz_2_str,1)
 
 def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,hostmask):
 	#TODO: handle more specific errors; this is super nasty but should keep the bot from crashing
@@ -689,11 +688,11 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,hostmask):
 				nick,is_pm,hostmask,state_change,use_pg,db_login)
 		
 		if(response_type.find('200 OK')<0):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: \"'+response_type+'\"',1)
+			pm(sock,channel,'Err: \"'+response_type+'\"',1)
 		else:
 			wiki_text=response[1]
 			if(wiki_text==''):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki got null page text',1)
+				pm(sock,channel,'Err: wiki got null page text',1)
 			else:
 				print(wiki_text) #debug
 				
@@ -707,11 +706,11 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,hostmask):
 						if(wiki_json[1][n].lower()==line_post_cmd.lower()):
 							break
 					else:
-						py3queueln(sock,'PRIVMSG '+channel+' :Please disambiguate; you may want one of the following: '+', '.join(wiki_json[1]))
+						pm(sock,channel,'Please disambiguate; you may want one of the following: '+', '.join(wiki_json[1]))
 						valid_output=False
 				
 				if(len(wiki_json[3])==0):
-					py3queueln(sock,'PRIVMSG '+channel+' :Err: No wikipedia pages found for \"'+line_post_cmd+'\"')
+					pm(sock,channel,'Err: No wikipedia pages found for \"'+line_post_cmd+'\"')
 					valid_output=False
 				
 				if(valid_output):
@@ -720,12 +719,12 @@ def handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,hostmask):
 					if(len(output_text)>=(MAX_IRC_LINE_LEN-reserved_len)):
 #						output_text=output_text[0:(MAX_IRC_LINE_LEN-reserved_len)]+'...'
 						output_text=output_text[0:MAX_IRC_LINE_LEN]+'...'
-					py3queueln(sock,'PRIVMSG '+channel+' :'+output_text,1)
+					pm(sock,channel,''+output_text,1)
 					
 					#link the wiki page itself?
-					py3queueln(sock,'PRIVMSG '+channel+' :'+' '.join(wiki_json[3]),1)
+					pm(sock,channel,''+' '.join(wiki_json[3]),1)
 	except:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: wiki failed to get page text',1)
+		pm(sock,channel,'Err: wiki failed to get page text',1)
 
 def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	#what's the word, dawg?
@@ -742,11 +741,11 @@ def handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 				def_line+=' | '
 			def_line+='('+str(i)+') '+definitions[i]
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :'+def_line[0:MAX_IRC_LINE_LEN])
+		pm(sock,channel,''+def_line[0:MAX_IRC_LINE_LEN])
 	#no definitions found; output the error message
 	else:
 		err_msg=definitions
-		py3queueln(sock,'PRIVMSG '+channel+' :'+err_msg)
+		pm(sock,channel,''+err_msg)
 
 #display an example of the given command
 def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
@@ -754,66 +753,66 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		line_post_cmd=cmd_esc+line_post_cmd
 	
 	if(line_post_cmd==''):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Missing argument (the command); see '+cmd_esc+'help for a command list',1)
+		pm(sock,channel,'Err: Missing argument (the command); see '+cmd_esc+'help for a command list',1)
 	elif(line_post_cmd==(cmd_esc+'wut')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wut',1)
+		pm(sock,channel,''+cmd_esc+'wut',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'wut','',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'example')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'example '+cmd_esc+'wut',1)
+		pm(sock,channel,''+cmd_esc+'example '+cmd_esc+'wut',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'example',cmd_esc+'wut',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'dbg')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dbg',1)
+		pm(sock,channel,''+cmd_esc+'dbg',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'dbg','',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'shup')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'shup 4',1)
+		pm(sock,channel,''+cmd_esc+'shup 4',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'shup','4',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'calc')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'calc 10*9^-3',1)
+		pm(sock,channel,''+cmd_esc+'calc 10*9^-3',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'calc','10*9^-3',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'wiki')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'wiki wikipedia',1)
+		pm(sock,channel,''+cmd_esc+'wiki wikipedia',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'wiki','wikipedia',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'define')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'define dictionary',1)
+		pm(sock,channel,''+cmd_esc+'define dictionary',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'define','dictionary',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'omdb')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'omdb Airplane!',1)
+		pm(sock,channel,''+cmd_esc+'omdb Airplane!',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'omdb','Airplane!',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'splchk')) or (line_post_cmd==(cmd_esc+'sp')) or (line_post_cmd==(cmd_esc+'spellcheck'))):
 		#intentional misspelling to demonstrate spellcheck ability
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'splchk misspeling',1)
+		pm(sock,channel,''+cmd_esc+'splchk misspeling',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'splchk','misspeling',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'dieroll')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'dieroll 6',1)
+		pm(sock,channel,''+cmd_esc+'dieroll 6',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'dieroll','6',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'time')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'time -6',1)
+		pm(sock,channel,''+cmd_esc+'time -6',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'time','-6',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'timecalc')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'timecalc 12:00 -6 +0',1)
+		pm(sock,channel,''+cmd_esc+'timecalc 12:00 -6 +0',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'timecalc','12:00 -6 +0',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'seen-quit')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'seen-quit neutrak',1)
+		pm(sock,channel,''+cmd_esc+'seen-quit neutrak',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'seen-quit','neutrak',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif(line_post_cmd==(cmd_esc+'oplist')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'oplist add neutrak',1)
+		pm(sock,channel,''+cmd_esc+'oplist add neutrak',1)
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'oplist','add neutrak',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'login')) or (line_post_cmd==(cmd_esc+'setpass'))):
-		py3queueln(sock,'PRIVMSG '+channel+' :Warn: command '+line_post_cmd+' is only valid in PM and contains sensitive information, so it does not have an example listed here',1)
+		pm(sock,channel,'Warn: command '+line_post_cmd+' is only valid in PM and contains sensitive information, so it does not have an example listed here',1)
 	elif(line_post_cmd==(cmd_esc+'tell')):
-		py3queueln(sock,'PRIVMSG '+channel+' :'+cmd_esc+'tell '+nick+' Hello')
+		pm(sock,channel,''+cmd_esc+'tell '+nick+' Hello')
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'tell',nick+' Hello',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
-		py3queueln(sock,'PRIVMSG '+channel+' :Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
+		pm(sock,channel,'Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
 	else:
 		for conversion in unit_conv_list:
 			conv_cmd=(cmd_esc+conversion.from_abbr+'->'+conversion.to_abbr)
 			if(line_post_cmd==conv_cmd):
-				py3queueln(sock,'PRIVMSG '+channel+' :'+conv_cmd+' 1',1)
+				pm(sock,channel,''+conv_cmd+' 1',1)
 				handle_bot_cmd(sock,cmd_esc,conv_cmd,'1',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 				break
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument ('+line_post_cmd+'); see '+cmd_esc+'help for a command list',1)
+			pm(sock,channel,'Err: Unrecognized argument ('+line_post_cmd+'); see '+cmd_esc+'help for a command list',1)
 
 def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 	global unit_conv_list
@@ -919,10 +918,10 @@ def handle_seen(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,log_file='log.txt')
 		#if this wasn't a quit ignore it
 	
 	if(last_seen_time=='0'):
-		py3queueln(sock,'PRIVMSG '+channel+' :Warn: I don\'t have any recent QUITs from nick '+line_post_cmd+' in my logs; I might not have been there; they might not have existed; no idea, man',3)
+		pm(sock,channel,'Warn: I don\'t have any recent QUITs from nick '+line_post_cmd+' in my logs; I might not have been there; they might not have existed; no idea, man',3)
 	else:
 		pretty_time=datetime.datetime.utcfromtimestamp(int(last_seen_time)).strftime('%Y-%m-%d %H:%M:%S UTC')
-		py3queueln(sock,'PRIVMSG '+channel+' :Nick '+line_post_cmd+' was last seen quitting a channel I was in at '+pretty_time+' ('+last_seen_time+'); check if they\'re here now; I don\'t do that',3)
+		pm(sock,channel,'Nick '+line_post_cmd+' was last seen quitting a channel I was in at '+pretty_time+' ('+last_seen_time+'); check if they\'re here now; I don\'t do that',3)
 
 
 def user_mode_letter(user_mode_symbol):
@@ -964,13 +963,13 @@ def is_channel_operator(channel,nick):
 
 def require_pg(sock,cmd_esc,cmd,channel):
 	if(not use_pg):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+cmd+' is only valid if a postgres database is in use; ask the bot operator to fix the configuration to allow this command to be used',1)
+		pm(sock,channel,'Err: '+cmd_esc+cmd+' is only valid if a postgres database is in use; ask the bot operator to fix the configuration to allow this command to be used',1)
 		return False
 	return True
 
 def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results):
 	if(len(args)<3):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
+		pm(sock,channel,'Err: you must provide the hostmask argument when adding a channel operator; it should be the hostmask that user is currently connected from',1)
 		return
 	
 	#NOTE: the hostmask of the command is the channel operator that is adding the user
@@ -986,9 +985,9 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 	#if this user is already authorized for this channel, just say so and return
 	if((len(channel_results)>0) and (len(user_results)>0)):
 		if(user_results[0]['pass_hash'] is None):
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  Hostmask has been updated to '+str([hostmask])+' but a password still needs to be set.  ',1)
+			pm(sock,channel,'User '+new_op_nick+' has already been invited using hostmask '+str(list(user_results[0]['hostmasks']))+' but has not set a password with '+cmd_esc+'setpass.  Hostmask has been updated to '+str([hostmask])+' but a password still needs to be set.  ',1)
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' and cannot be added again',1)
+			pm(sock,channel,'User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' and cannot be added again',1)
 	
 	#if this user is not yet authorized for this channel but exists in the oplist_users table,
 	#then add an associated entry for user_channel_modes
@@ -997,7 +996,7 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 		postgre_ret=db_handle.prepare(pg_query)
 		insert_result=postgre_ret(new_op_nick,channel,'o')
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was successfully granted channel ops on '+channel,1)
+		pm(sock,channel,'User '+new_op_nick+' was successfully granted channel ops on '+channel,1)
 		
 		#and grant them ops now
 		py3queueln(sock,'MODE '+channel+' +o '+new_op_nick,1)
@@ -1013,7 +1012,7 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 		postgre_ret=db_handle.prepare(pg_query)
 		insert_result=postgre_ret(new_op_nick,channel,'o')
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
+		pm(sock,channel,'User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
 	
 
 def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results):
@@ -1026,7 +1025,7 @@ def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_han
 	if(new_op_nick in joined_channels[channel]['names']):
 		py3queueln(sock,'MODE '+channel+' -o '+new_op_nick,1)
 	
-	py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has been removed from the channel op list for '+channel+'; their mode authorizations on other channels remain unchanged',1)
+	pm(sock,channel,'User '+new_op_nick+' has been removed from the channel op list for '+channel+'; their mode authorizations on other channels remain unchanged',1)
 
 
 def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login):
@@ -1034,17 +1033,17 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 		return
 	
 	if(not (is_channel_operator(channel,nick))):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist can only be used by channel operators; come back when you have ops',1)
+		pm(sock,channel,'Err: '+cmd_esc+'oplist can only be used by channel operators; come back when you have ops',1)
 		return
 	
 	if(not (is_channel_operator(channel,bot_nick))):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'oplist can only be used if this bot has channel operator permission; grant me ops first',1)
+		pm(sock,channel,'Err: '+cmd_esc+'oplist can only be used if this bot has channel operator permission; grant me ops first',1)
 		return
 	
 	args=line_post_cmd.split(' ')
 	
 	if(len(args)<2):
-		py3queueln(sock,'PRIVMSG '+channel+' :Usage: '+cmd_esc+'oplist <add|rm|check> <user> [hostmask]',1)
+		pm(sock,channel,'Usage: '+cmd_esc+'oplist <add|rm|check> <user> [hostmask]',1)
 		return
 	new_op_nick=args[1]
 	
@@ -1068,19 +1067,19 @@ def handle_oplist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_lo
 		#if this user is already authorized for this channel, just say so and return
 		if((len(channel_results)>0) and (len(user_results)>0)):
 			if(user_results[0]['pass_hash'] is None):
-				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has already been invited as an operator of '+channel+' using hostmask '+str(user_results[0]['hostmasks'])+' but has not set a password with '+cmd_esc+'setpass. ',1)
+				pm(sock,channel,'User '+new_op_nick+' has already been invited as an operator of '+channel+' using hostmask '+str(user_results[0]['hostmasks'])+' but has not set a password with '+cmd_esc+'setpass. ',1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' on this channel',1)
+				pm(sock,channel,'User '+new_op_nick+' already has an account with mode +'+channel_results[0]['mode_str']+' on this channel',1)
 		
 		elif(len(user_results)>0):
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has an account registered with this bot but does not have channel ops on channel '+channel,1)
+			pm(sock,channel,'User '+new_op_nick+' has an account registered with this bot but does not have channel ops on channel '+channel,1)
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :User '+new_op_nick+' has no account registered with this bot',1)
+			pm(sock,channel,'User '+new_op_nick+' has no account registered with this bot',1)
 		
 		db_handle.close()
 		return
 	else:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized subcommand '+args[0],1)
+		pm(sock,channel,'Err: Unrecognized subcommand '+args[0],1)
 		
 
 	db_handle.close()
@@ -1090,13 +1089,13 @@ def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_log
 		return
 	
 	if(not is_pm):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'login is only valid in PM; you should change your password IMMEDIATELY with '+cmd_esc+'setpass',1)
+		pm(sock,channel,'Err: '+cmd_esc+'login is only valid in PM; you should change your password IMMEDIATELY with '+cmd_esc+'setpass',1)
 		return
 
 	args=line_post_cmd.split(' ')
 	
 	if(len(args)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Usage: '+cmd_esc+'login <pass> [channel]',1)
+		pm(sock,channel,'Usage: '+cmd_esc+'login <pass> [channel]',1)
 		return
 	
 	db_handle=postgresql.open('pq://'+pg_user+':'+pg_passwd+'@localhost/'+pg_dbname)
@@ -1108,19 +1107,19 @@ def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_log
 	channel_results=postgre_ret(nick)
 	
 	if(len(user_results)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot log in because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
+		pm(sock,channel,'Err: You cannot log in because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
 		db_handle.close()
 		return
 	
 	#if the user hasn't prevoiusly set a password
 	if(user_results[0]['pass_hash'] is None):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot log in because you have not set a password.  Set one with '+cmd_esc+'setpass first.',1)
+		pm(sock,channel,'Err: You cannot log in because you have not set a password.  Set one with '+cmd_esc+'setpass first.',1)
 		db_handle.close()
 		return
 	
 	pw_hash=user_results[0]['pass_hash'].encode('utf-8')
 	if(bcrypt.hashpw(args[0].encode('utf-8'),pw_hash)!=pw_hash):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: The provided password value is incorrect; try again',1)
+		pm(sock,channel,'Err: The provided password value is incorrect; try again',1)
 		db_handle.close()
 		return
 	db_handle.close()
@@ -1136,7 +1135,7 @@ def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_log
 		for mode_chr in channel_dict['mode_str']:
 			py3queueln(sock,'MODE '+channel_dict['channel']+' +'+mode_chr+' '+nick,1)
 	
-	py3queueln(sock,'PRIVMSG '+channel+' :You are now logged in'+(' to channel '+args[1] if len(args)>=2 else ''),1)
+	pm(sock,channel,'You are now logged in'+(' to channel '+args[1] if len(args)>=2 else ''),1)
 
 
 def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login):
@@ -1144,13 +1143,13 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 		return
 	
 	if(not is_pm):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'setpass is only valid in PM (and use a different password from the one you just posted in the channel...)',1)
+		pm(sock,channel,'Err: '+cmd_esc+'setpass is only valid in PM (and use a different password from the one you just posted in the channel...)',1)
 		return
 	
 	args=line_post_cmd.split(' ')
 	
 	if(len(args)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Usage: '+cmd_esc+'setpass <pass> [oldpass]',1)
+		pm(sock,channel,'Usage: '+cmd_esc+'setpass <pass> [oldpass]',1)
 		return
 
 	db_handle=postgresql.open('pq://'+pg_user+':'+pg_passwd+'@localhost/'+pg_dbname)
@@ -1159,7 +1158,7 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 	user_results=postgre_ret(nick)
 	
 	if(len(user_results)<1):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
+		pm(sock,channel,'Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first, and make sure they specify your hostmask correctly',1)
 		db_handle.close()
 		return
 	
@@ -1169,22 +1168,22 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 		#since we don't have a password
 		#we're authenticating using a combination of username and hostmask until a password is set
 		if(not (hostmask in (user_results[0]['hostmasks']))):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first',1)
+			pm(sock,channel,'Err: You cannot set a password because you do not have an account.  Ask a channel operator to add you using '+cmd_esc+'oplist first',1)
 			db_handle.close()
 			return
 	elif(len(args)<2):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: You must provide your old password when setting a new one',1)
+		pm(sock,channel,'Err: You must provide your old password when setting a new one',1)
 		db_handle.close()
 		return
 	else:
 		pw_hash=user_results[0]['pass_hash'].encode('utf-8')
 		if(bcrypt.hashpw(args[1].encode('utf-8'),pw_hash)!=pw_hash):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: The provided oldpass value is incorrect; try again',1)
+			pm(sock,channel,'Err: The provided oldpass value is incorrect; try again',1)
 			db_handle.close()
 			return
 	
 	if(len(args[0])<10):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Passwords must be at least 10 characters long',1)
+		pm(sock,channel,'Err: Passwords must be at least 10 characters long',1)
 		db_handle.close()
 		return
 	
@@ -1196,7 +1195,7 @@ def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,us
 	pg_query='UPDATE user_accounts SET pass_hash=$1 WHERE nick=$2'
 	postgre_ret=db_handle.prepare(pg_query)
 	postgre_ret(pw_hash.decode('utf-8'),nick)
-	py3queueln(sock,'PRIVMSG '+channel+' :Passphrase set successfully!  Remember your password because we cannot recover it (though we can reset it)',1)
+	pm(sock,channel,'Passphrase set successfully!  Remember your password because we cannot recover it (though we can reset it)',1)
 	
 	db_handle.close()
 
@@ -1205,18 +1204,18 @@ def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_p
 	global tell_queue
 	
 	if(is_pm):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: This is a PM.  This only works in a channel; messages are sent the next time the user joins that channel.  ')
+		pm(sock,channel,'Err: This is a PM.  This only works in a channel; messages are sent the next time the user joins that channel.  ')
 		return False
 	
 	from_nick=nick
 	success,to_nick,content=get_token(line_post_cmd,' ')
 	if(not success):
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Wrong argument structure; Usage: '+cmd_esc+'tell <nick> <message>')
+		pm(sock,channel,'Err: Wrong argument structure; Usage: '+cmd_esc+'tell <nick> <message>')
 		return False
 	
 	for ch_nick in joined_channels[channel]['names']:
 		if(to_nick.lower()==ch_nick.lower()):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: That user is already in this channel; they heard you.  ')
+			pm(sock,channel,'Err: That user is already in this channel; they heard you.  ')
 			return False
 	
 	utc_now=datetime.datetime.utcnow()
@@ -1227,7 +1226,7 @@ def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_p
 	else:
 		tell_queue.append(tell_msg(utc_now_str,from_nick,to_nick,channel,content))
 	
-	py3queueln(sock,'PRIVMSG '+channel+' :Message stored.  I will tell them your message the next time they join '+channel)
+	pm(sock,channel,'Message stored.  I will tell them your message the next time they join '+channel)
 	
 	return True
 
@@ -1261,7 +1260,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			if(output.startswith('!')):
 				output='\\'+output
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
+		pm(sock,channel,''+output,1)
 #		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
 		handled=True
@@ -1273,16 +1272,16 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		if(line_post_cmd=='always'):
 			if(nick in authed_users):
 				dbg_state='always'
-				py3queueln(sock,'PRIVMSG '+channel+' :Info: Now outputting debug messages in '+(','.join(dbg_channels))+' without being asked',1)
+				pm(sock,channel,'Info: Now outputting debug messages in '+(','.join(dbg_channels))+' without being asked',1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: You are not authorized to change debug settings',1)
+				pm(sock,channel,'Err: You are not authorized to change debug settings',1)
 		#set debug channel OFF if authorized
 		elif(line_post_cmd=='never'):
 			if(nick in authed_users):
 				dbg_state='never'
-				py3queueln(sock,'PRIVMSG '+channel+' :Info: No longer outputting debug messages without being asked',1)
+				pm(sock,channel,'Info: No longer outputting debug messages without being asked',1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: You are not authorized to change debug settings',1)
+				pm(sock,channel,'Err: You are not authorized to change debug settings',1)
 		#no argument or an index means display some debug info from the history
 		elif(line_post_cmd.strip()=='' or line_post_cmd.isdigit()):
 			#print the entire debug history to the console a line at a time
@@ -1296,19 +1295,19 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			#bounds checking for security and to prevent crashing
 			if(hist_ofst<0 or hist_ofst>=len(dbg_hist)):
 				hist_ofst=0
-				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid history offset; displaying last debug value',1)
+				pm(sock,channel,'Warn: Invalid history offset; displaying last debug value',1)
 			
 			#if no argument is given then assume the user wanted the last debug message
 			if(len(dbg_hist)>0):
-#				py3queueln(sock,'PRIVMSG '+channel+' :'+dbg_hist[len(dbg_hist)-1-hist_ofst],2)
+#				pm(sock,channel,''+dbg_hist[len(dbg_hist)-1-hist_ofst],2)
 				line=dbg_hist[len(dbg_hist)-1-hist_ofst]
-				py3queueln(sock,'PRIVMSG '+channel+' :'+line[0:MAX_IRC_LINE_LEN-80],2)
+				pm(sock,channel,''+line[0:MAX_IRC_LINE_LEN-80],2)
 				if(len(line[MAX_IRC_LINE_LEN-80:])>0):
-					py3queueln(sock,'PRIVMSG '+channel+' :'+line[MAX_IRC_LINE_LEN-80:],2)
+					pm(sock,channel,''+line[MAX_IRC_LINE_LEN-80:],2)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: No debug history exists',1)
+				pm(sock,channel,'Err: No debug history exists',1)
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unrecognized argument given to dbg, \''+line_post_cmd+'\'',1)
+			pm(sock,channel,'Err: Unrecognized argument given to dbg, \''+line_post_cmd+'\'',1)
 		handled=True
 	elif(cmd==(cmd_esc+'help')):
 		handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
@@ -1330,7 +1329,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			nice_lvl=max(nice_lvl,4)
 		
 		py3clearq(nice_lvl)
-		py3queueln(sock,'PRIVMSG '+channel+' :Info: outgoing message queue cleared of low-priority messages (nice_lvl='+str(nice_lvl)+')',1)
+		pm(sock,channel,'Info: outgoing message queue cleared of low-priority messages (nice_lvl='+str(nice_lvl)+')',1)
 		handled=True
 	elif(cmd==(cmd_esc+'part')):
 		if(not is_pm):
@@ -1339,9 +1338,9 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			if(is_channel_operator(channel,nick)):
 				py3queueln(sock,'PART '+channel+' :Goodbye for now (you can invite me back any time)',1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: '+cmd_esc+'part can only be used by channel operators; come back when you have ops',1)
+				pm(sock,channel,'Err: '+cmd_esc+'part can only be used by channel operators; come back when you have ops',1)
 		else:
-			py3queueln(sock,'PRIVMSG '+channel+' :part from where, asshole? this is a PM!',1)
+			pm(sock,channel,'part from where, asshole? this is a PM!',1)
 		handled=True
 	#conversions are their own function now
 	elif(handle_conversion(sock,cmd_esc,cmd,line_post_cmd,channel)):
@@ -1350,17 +1349,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		try:
 			err_msgs,result=rpn.rpn_eval(rpn.rpn_translate(line_post_cmd))
 			if(len(result)==1):
-				py3queueln(sock,'PRIVMSG '+channel+' :'+str(result[0]),1)
+				pm(sock,channel,''+str(result[0]),1)
 			else:
-				py3queueln(sock,'PRIVMSG '+channel+' :Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
+				pm(sock,channel,'Warn: An error occurred during evaluation; simplified RPN expression is '+str(result),1)
 				for err_idx in range(0,len(err_msgs)):
-					py3queueln(sock,'PRIVMSG '+channel+' :Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
+					pm(sock,channel,'Err #'+str(err_idx)+': '+str(err_msgs[err_idx]),3)
 		except ValueError:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (ValueError) (divide by zero?)',1)
+			pm(sock,channel,'Err: Could not parse expression (ValueError) (divide by zero?)',1)
 		except IndexError:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Could not parse expression (IndexError) (mismatched parens?)',1)
+			pm(sock,channel,'Err: Could not parse expression (IndexError) (mismatched parens?)',1)
 		except:
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception in rpn parsing; tell neutrak the command you used to get this and he\'ll look into it',1)
+			pm(sock,channel,'Err: Unhandled exception in rpn parsing; tell neutrak the command you used to get this and he\'ll look into it',1)
 		handled=True
 	elif(cmd==(cmd_esc+'wiki')):
 		handle_wiki(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm,hostmask)
@@ -1371,7 +1370,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		handle_define(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
 		handled=True
 	elif(cmd==(cmd_esc+'source')):
-		py3queueln(sock,'PRIVMSG '+channel+' :bot source code: '+SOURCE_CODE_URL,1)
+		pm(sock,channel,'bot source code: '+SOURCE_CODE_URL,1)
 		handled=True
 	elif((cmd==(cmd_esc+'omdb')) or (cmd==(cmd_esc+'imdb'))):
 		handle_omdb(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
@@ -1385,14 +1384,14 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			try:
 				sides=int(line_post_cmd)
 			except ValueError:
-				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid number of sides, assuming d-6',1)
+				pm(sock,channel,'Warn: Invalid number of sides, assuming d-6',1)
 				sides=6
 		if(sides<1):
-			py3queueln(sock,'PRIVMSG '+channel+' :Warn: Number of sides less than 1, setting number of sides 1 (this will return 1)',1)
+			pm(sock,channel,'Warn: Number of sides less than 1, setting number of sides 1 (this will return 1)',1)
 			sides=1
 		
 		value=random.randint(1,sides)
-		py3queueln(sock,'PRIVMSG '+channel+' :Rolled a '+str(value)+' with a d'+str(sides),1)
+		pm(sock,channel,'Rolled a '+str(value)+' with a d'+str(sides),1)
 		
 		handled=True
 	elif(cmd==(cmd_esc+'time')):
@@ -1401,12 +1400,12 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			try:
 				tz=float(line_post_cmd)
 			except ValueError:
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: '+line_post_cmd+' is not a valid UTC-offset timezone; will give UTC time instead...',1)
+				pm(sock,channel,'Err: '+line_post_cmd+' is not a valid UTC-offset timezone; will give UTC time instead...',1)
 		if(abs(tz)>24):
-			py3queueln(sock,'PRIVMSG '+channel+' :Err: timezone offsets from utc cannot be outside the range [-24,24] because that makes no sense; giving UTC time...')
+			pm(sock,channel,'Err: timezone offsets from utc cannot be outside the range [-24,24] because that makes no sense; giving UTC time...')
 			tz=0
 		current_time=time.asctime(time.gmtime(time.time()+(tz*60*60)))
-		py3queueln(sock,'PRIVMSG '+channel+' :Current time is '+current_time+' (UTC '+('+'+str(tz) if tz>=0 else str(tz))+')')
+		pm(sock,channel,'Current time is '+current_time+' (UTC '+('+'+str(tz) if tz>=0 else str(tz))+')')
 		handled=True
 	elif(cmd==(cmd_esc+'timecalc')):
 		handle_timecalc(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm)
@@ -1450,7 +1449,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			
 			#this was a valid number, but something went wrong during conversion
 			if(not found_conversion):
-				py3queueln(sock,'PRIVMSG '+channel+' :Err: Conversion not found '+line_post_cmd,1)
+				pm(sock,channel,'Err: Conversion not found '+line_post_cmd,1)
 			
 			#in any case if we got a number don't handle this line any more
 			handled=True
@@ -1458,7 +1457,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		#so output an error for PM, or just do nothing in a channel
 		except ValueError:
 			if(is_pm):
-				py3queueln(sock,'PRIVMSG '+channel+' :Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
+				pm(sock,channel,'Warn: Invalid command: \"'+cmd+'\"; see '+cmd_esc+'help for help',1)
 		
 		#this prevents the bot from learning from unrecognized ! commands
 		#(which are usually meant for another bot)
@@ -1515,7 +1514,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 		#if this was a command for the bot, handle it
 		cmd_handled,cmd_dbg_str=handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	except Exception as e:
-		py3queueln(sock,'PRIVMSG '+channel+' :Err: Unhandled exception '+(str(e).replace("\n",' '))+'; tell neutrak the command you used to get this and he\'ll look into it',1)
+		pm(sock,channel,'Err: Unhandled exception '+(str(e).replace("\n",' '))+'; tell neutrak the command you used to get this and he\'ll look into it',1)
 		return (lines_since_write,lines_since_sort_chk)
 	
 	if(cmd_handled):
@@ -1546,7 +1545,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 #		dbg_str='[dbg] generated from line \"'+line_post_cmd+'\"'+"\n"+dbg_str
 		dbg_str='[dbg] (\"'+line_post_cmd+'\") '+dbg_str
 		
-		py3queueln(sock,'PRIVMSG '+channel+' :'+output,1)
+		pm(sock,channel,''+output,1)
 		
 		#because people often talk to the bot in complete phrases,
 		#go ahead and include these lines in the learning set
@@ -1560,7 +1559,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	else:
 		#if this was a pm then let the user know how to get help if they want it
 		if(is_pm):
-			py3queueln(sock,'PRIVMSG '+channel+' :learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)',3)
+			pm(sock,channel,'learning... (use '+cmd_esc+'help to get help, or '+cmd_esc+'wut to generate text)',3)
 		
 		lines_since_write,lines_since_sort_chk=learn_from(line,state_change,state_file,lines_since_write,lines_since_sort_chk)
 	
@@ -1721,7 +1720,7 @@ def run_periodic_op_rqst(sock):
 								ch_op_nicks.append(ch_user)
 						
 						if(len(ch_op_nicks)>0):
-							py3queueln(sock,'PRIVMSG '+channel+' :'+(' '.join(ch_op_nicks))+' - give me mode +o please',0)
+							pm(sock,channel,''+(' '.join(ch_op_nicks))+' - give me mode +o please',0)
 						
 						joined_channels[channel]['last_op_rqst']=time.time()
 				
