@@ -257,6 +257,18 @@ def li_to_oz(li):
 
 unit_conv_list.append(unit_conv('volume','l','liters','oz','fluid ounces',li_to_oz))
 
+#unit conversion gallons to liters
+def g_to_li(g):
+	return g*3.7854
+
+unit_conv_list.append(unit_conv('volume','g','gallons','l','liters',g_to_li))
+
+#unit conversion liters to gallons
+def li_to_g(li):
+	return li/(g_to_li(1))
+
+unit_conv_list.append(unit_conv('volume','l','liters','g','gallons',li_to_g))
+
 #add generated help text for unit-conv messages
 for conversion in unit_conv_list:
 	conversion_cmd=conversion.from_abbr+'->'+conversion.to_abbr+' <value>'
