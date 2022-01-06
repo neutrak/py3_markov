@@ -20,6 +20,7 @@
 #an example of how this is broken can be seen by running on the input "6 * ~5 + 3"; this should yeild 3, but instead fails to complete because there aren't enough arguments for *
 #despite known errors I have left the not operator in, because correct behavior can be introduced with parentheses and it's sometimes a necessary operator
 
+import re
 import sys
 
 #does operator a have precedence over operator b?
@@ -157,6 +158,11 @@ def get_token(exp,i):
 def rpn_translate(exp):
 	#remove spaces
 	exp=exp.replace(' ','')
+	
+	#replace any string of one or more = characters with a single equal character
+	#since we don't support variable assignment
+	#so '=' == '==', '==' == '===', '=' == '===', etc.
+	exp=re.sub(r'(=)+','=',exp)
 	
 	#for a - which is not preceded by a number, precede it by 0 and put parens around the operation
 	new_exp=''

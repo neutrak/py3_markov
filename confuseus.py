@@ -122,6 +122,7 @@ cmd_helptext={
 	'login <pass> [channel]':'[PM ONLY] if you are an authorized channel operator, logs you in to that channel; passphrases must be at least 10 characters and contain no spaces; there are no other requirements',
 	'setpass <pass> [oldpass]':'[PM ONLY] sets a password for your channel operator account, if you have been invited to become a channel operator; if you have already set a password oldpass is required for authorization',
 	'tell <nick> <message>':'leaves a message for a user the next time they join this channel (not stored on disk; if the bot disconnects your message is lost)',
+	'calc':'simple calculator, uses standard mathematical infix notation, supports + (add), - (sub), * (mul), / (div), ^ (exp), and parentheses for precedence',
 }
 
 #a list of all unit conversions we currently support
@@ -865,10 +866,10 @@ def handle_help(sock,cmd_esc,cmd,line_post_cmd,channel,is_pm):
 			break
 	
 	if(help_cmd_exists and (not found_help_cmd)):
-		pm(sock,channel,'Err: Unrecognzied command '+help_cmd+'; you can send !help in PM to get a full command list')
+		pm(sock,channel,'Err: Unrecognzied command '+help_cmd+'; you can send '+cmd_esc+'help in PM to get a full command list')
 	
 	if((not is_pm) and (not help_cmd_exists)):
-		pm(sock,channel,'This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM !help for more detailed help; !help !command for detailed information about a particular command',3)
+		pm(sock,channel,'This is a simple markov chain bot; use '+cmd_esc+'wut or address me by name to generate text; PM '+cmd_esc+'help for more detailed help; '+cmd_esc+'help '+cmd_esc+'command for detailed information about a particular command',3)
 	
 
 #check when a user was last seen
@@ -1023,7 +1024,7 @@ def handle_oplist_add(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_ha
 		postgre_ret=db_handle.prepare(pg_query)
 		insert_result=postgre_ret(new_op_nick,channel,'o')
 		
-		pm(sock,channel,'User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with !setpass in PM before disconnecting in order to complete account setup',1)
+		pm(sock,channel,'User '+new_op_nick+' was added to the channel op list for '+channel+' and will now need to set their password with '+cmd_esc+'setpass in PM before disconnecting in order to complete account setup',1)
 	
 
 def handle_oplist_rm(sock,cmd_esc,cmd,args,channel,nick,is_pm,new_op_nick,db_handle,user_results,channel_results):
