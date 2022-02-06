@@ -1147,7 +1147,8 @@ def handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_log
 		for mode_chr in channel_dict['mode_str']:
 			py3queueln(sock,'MODE '+channel_dict['channel']+' +'+mode_chr+' '+nick,1)
 	
-	pm(sock,channel,'You are now logged in'+(' to channel '+args[1] if len(args)>=2 else ''),1)
+	py3queueln(s=sock,message='NOTICE '+nick+' :You are now logged in '+('to channel '+args[1] if len(args)>=2 else ''),priority=1)
+#	pm(sock,channel,'You are now logged in'+(' to channel '+args[1] if len(args)>=2 else ''),1)
 
 
 def handle_setpass(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login):
@@ -1474,6 +1475,15 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 		#this prevents the bot from learning from unrecognized ! commands
 		#(which are usually meant for another bot)
 #		handled=True
+	
+	#in the special case of a PM also support some aliases for things NickServ does on other networks
+	#(but this bot does here because ircnet)
+	elif(is_pm):
+		#NOTE: in order to be compatible with some existing clients and to respect NickServ convention
+		#we also support the command IDENTIFY, but only in private messages
+		if(cmd.upper()=='IDENTIFY'):
+			handle_login(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,use_pg,db_login)
+			handled=True
 
 	return (handled,dbg_str)
 
