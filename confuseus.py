@@ -456,7 +456,7 @@ def send_tell_queue_msgs(sock,channel,nick):
 		tell_queue_msgs=markov.pg_run_query(db_login,'SELECT * FROM tell_msg WHERE LOWER(channel)=$1 AND LOWER(nick)=$2',(channel.lower(),nick.lower()))
 		if(len(tell_queue_msgs)>0):
 			for tell_entry in tell_queue_msgs:
-				pm(sock,channel,'['+str(tell_entry['time_sent'])+'] <'+tell_entry['sender']+'> '+tell_entry['nick']+': '+tell_entry['content'],1)
+				pm(sock,channel,'['+str(tell_entry['time_sent'])+' (UTC)] <'+tell_entry['sender']+'> '+tell_entry['nick']+': '+tell_entry['content'],1)
 		markov.pg_run_query(db_login,'DELETE FROM tell_msg WHERE LOWER(channel)=$1 AND LOWER(nick)=$2',(channel.lower(),nick.lower()))
 	else:
 		global tell_queue
