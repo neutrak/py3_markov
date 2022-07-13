@@ -1,7 +1,7 @@
 {
 	"cmd_esc":"!",
 	"bot_nick":"confuseus",
-	"host":"ssl.irc.atw-inter.net",
+	"host":"ssl.ircnet.io",
 	"port":6697,
 	"use_ssl":true,
 	"gen_cmd":false,
