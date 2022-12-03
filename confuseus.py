@@ -123,6 +123,7 @@ cmd_helptext={
 	'setpass <pass> [oldpass]':'[PM ONLY] sets a password for your channel operator account, if you have been invited to become a channel operator; if you have already set a password oldpass is required for authorization',
 	'tell <nick> <message>':'leaves a message for a user the next time they join this channel (not stored on disk; if the bot disconnects your message is lost)',
 	'calc':'simple calculator, uses standard mathematical infix notation, supports + (add), - (sub), * (mul), / (div), ^ (exp), and parentheses for precedence',
+	'toggle-blacklist <word or phrase>':'enables or disables the blacklisting of a given word or phrase for the current channel when generating nonsense',
 }
 
 #a list of all unit conversions we currently support
@@ -814,6 +815,9 @@ def handle_example(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	elif(line_post_cmd==(cmd_esc+'tell')):
 		pm(sock,channel,''+cmd_esc+'tell '+nick+' Hello')
 		handle_bot_cmd(sock,cmd_esc,cmd_esc+'tell',nick+' Hello',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
+	elif(line_post_cmd==(cmd_esc+'toggle-blacklist')):
+		pm(sock,channel,''+cmd_esc+'toggle-blacklist fudge')
+		handle_bot_cmd(sock,cmd_esc,cmd_esc+'toggle-blacklist','fudge',channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
 	elif((line_post_cmd==(cmd_esc+'help')) or (line_post_cmd==(cmd_esc+'part')) or (line_post_cmd==(cmd_esc+'source'))):
 		pm(sock,channel,'Warn: '+line_post_cmd+' takes no arguments and so has no examples; see '+cmd_esc+'help for information about it',1)
 	else:
@@ -1243,6 +1247,53 @@ def handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_p
 	
 	return True
 
+def handle_bot_markov_get_word_blacklist(channel):
+	word_blacklist=[]
+	if(use_pg):
+		db_handle=postgresql.open('pq://'+pg_user+':'+pg_passwd+'@localhost/'+pg_dbname)
+		pg_query='SELECT word_or_phrase FROM blacklist_words WHERE channel=$1'
+		postgre_ret=db_handle.prepare(pg_query)
+		select_result=postgre_ret(channel)
+		db_handle.close()
+		
+		word_blacklist=list(map(lambda row: row[0],select_result))
+		
+		print('handle_bot_markov_get_word_blacklist for channel '+channel+' got word_blacklist=',word_blacklist) #debug
+	return word_blacklist
+
+def handle_toggle_blacklist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
+	if(not use_pg):
+		pm(sock,channel,'Err: toggle blacklist only works with postgresql database backend enabled',1)
+		return
+	
+	#open a database connection
+	db_handle=postgresql.open('pq://'+pg_user+':'+pg_passwd+'@localhost/'+pg_dbname)
+	
+	#check if this blacklisted word or phrase is already configured
+	pg_query='SELECT * FROM blacklist_words WHERE channel=$1 AND word_or_phrase=$2'
+	postgre_ret=db_handle.prepare(pg_query)
+	select_result=postgre_ret(channel,line_post_cmd)
+	
+	#if this word or phrase was already blacklisted in this channel
+	if(len(select_result)==1):
+		#then toggle it off so it's no longer blacklisted in this channel
+		pg_query='DELETE FROM blacklist_words WHERE channel=$1 AND word_or_phrase=$2'
+		postgre_ret=db_handle.prepare(pg_query)
+		delete_result=postgre_ret(channel,line_post_cmd)
+		
+		pm(sock,channel,'Removed word or phrase "'+line_post_cmd+'" from blacklist for channel '+channel,1)
+	#if this word or phrase was NOT blacklisted in this channel
+	else:
+		#then blacklist it now
+		pg_query='INSERT INTO blacklist_words (channel,word_or_phrase) VALUES ($1,$2)'
+		postgre_ret=db_handle.prepare(pg_query)
+		insert_result=postgre_ret(channel,line_post_cmd)
+		
+		pm(sock,channel,'Added word or phrase "'+line_post_cmd+'" to blacklist for channel '+channel,1)
+	
+	db_handle.close()
+	
+
 def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login):
 	global gen_cmd
 	global unit_conv_list
@@ -1259,7 +1310,7 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	if((cmd==(cmd_esc+'wut')) or (cmd==cmd_esc)):
 		output=''
 		if(line_post_cmd!=''):
-			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets)
+			output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets,word_blacklist=handle_bot_markov_get_word_blacklist(channel))
 		if(output==''):
 			output,dbg_str=markov.generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=False)
 		
@@ -1444,6 +1495,10 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 	elif(cmd==(cmd_esc+'tell')):
 		handle_tell(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,use_pg,db_login)
 		handled=True
+	#toggle-blacklist -> toggles on/off whether a given phrase is blacklisted on the current channel
+	elif(cmd==(cmd_esc+'toggle-blacklist')):
+		handle_toggle_blacklist(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,state_change,use_pg,db_login)
+		handled=True
 	elif(cmd.startswith(cmd_esc)):
 		try:
 			#alternate conversion syntax
@@ -1547,7 +1602,7 @@ def handle_privmsg(sock,line,state_change,state_file,lines_since_write,lines_sin
 	
 	#support question/answer style markov chain-ing stuff
 	elif(cmd.startswith(bot_nick)):
-		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets)
+		output,dbg_str=markov.gen_from_str(state_change,use_pg,db_login,irc_str_map(line_post_cmd),random.randint(0,1)+1,retries_left=3,qa_sets=qa_sets,word_blacklist=handle_bot_markov_get_word_blacklist(channel))
 		
 		#if it didn't have that word as a starting state,
 		#then just go random (fall back functionality)

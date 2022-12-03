@@ -476,7 +476,7 @@ def generate(state_change=[],prefix=['',''],word_limit=40,acc='',verbose_dbg=Tru
 	return (acc.rstrip(' '),dbg_str)
 
 #generate from a given starting string
-def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,prefix_len=2,retries_left=0,qa_sets=[]):
+def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,prefix_len=2,retries_left=0,qa_sets=[],word_blacklist=[]):
 	output=''
 	dbg_str=''
 
@@ -550,11 +550,18 @@ def gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt=1,prefix_
 		#retry if we didn't get anything good (don't just repeat the user)
 		if((output==(' '.join(prefix_words)).lstrip(' ')) or (output==start_str)):
 			if(retries_left>0):
-				return gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt,retries_left-1)
+				return gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt,retries_left-1,word_blacklist=word_blacklist)
 			else:
 				output=''
 	if(output==''):
 		output,dbg_str=generate(state_change,use_pg=use_pg,db_login=db_login,back_gen=back_gen)
+
+	#check if the generated output contained a blacklisted phrase
+	for word_or_phrase in word_blacklist:
+		#if so, then try again to generate something that doesn't
+		#as long as we have some retries left
+		if(output.find(word_or_phrase)>=0):
+			return gen_from_str(state_change,use_pg,db_login,start_str,start_word_cnt,retries_left-1,word_blacklist=word_blacklist)
 	
 	return output,dbg_str
 

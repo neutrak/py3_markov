@@ -62,3 +62,21 @@ CREATE TABLE IF NOT EXISTS tell_msg(
 	content VARCHAR(256) NOT NULL
 );
 
+
+--a table of blacklisted words and phrases
+--that we don't want to generate
+CREATE TABLE IF NOT EXISTS blacklist_words(
+	--the channel in which this blacklist applies
+	--if we ever support multiple simultaneous server connections
+	--server would be stored here too
+	--but for now we don't so it's not
+	channel VARCHAR(256) NOT NULL,
+	
+	--the blacklisted word or phrase
+	word_or_phrase VARCHAR(512) NOT NULL,
+	
+	--entries are the same iff they share both channel and word_or_phrase
+	PRIMARY KEY (channel,word_or_phrase)
+);
+
+
