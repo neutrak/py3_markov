@@ -1450,12 +1450,17 @@ def handle_bot_cmd(sock,cmd_esc,cmd,line_post_cmd,channel,nick,is_pm,hostmask,st
 			except ValueError:
 				pm(sock,channel,'Warn: Invalid number of sides, assuming d-6',1)
 				sides=6
-		if(sides<1):
-			pm(sock,channel,'Warn: Number of sides less than 1, setting number of sides 1 (this will return 1)',1)
-			sides=1
-		
-		value=random.randint(1,sides)
-		pm(sock,channel,'Rolled a '+str(value)+' with a d'+str(sides),1)
+		if(sides==1):
+			#no value makes sense for a d1 (it's always a 1)
+			#this joke in honor of Shishichi
+			pm(sock,channel,'Your Möbius strip lands on the desk',1)
+		else:
+			if(sides<1):
+				pm(sock,channel,'Warn: Number of sides less than 1, setting number of sides 1 (this will return 1)',1)
+				sides=1
+			
+			value=random.randint(1,sides)
+			pm(sock,channel,'Rolled a '+str(value)+' with a d'+str(sides),1)
 		
 		handled=True
 	elif(cmd==(cmd_esc+'time')):
