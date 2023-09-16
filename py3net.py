@@ -26,9 +26,9 @@ def log_line(line,log_file='log.txt'):
 #s is the socket
 def py3send(s,message):
 	try:
-		s.send(message.encode('latin-1','replace'))
+		s.send(message.encode('utf-8','replace'))
 	except UnicodeEncodeError:
-		print('Err: Unicode to latin-1 conversion error, ignoring message '+str(message))
+		print('Err: Unicode conversion error, ignoring message '+str(message))
 
 def py3sendln(s,message):
 	log_line('>> '+message)
@@ -89,7 +89,7 @@ def py3recv(s,byte_count):
 			return data
 		return data.decode('utf-8')
 	except UnicodeDecodeError:
-		print('Err: latin-1 to Unicode conversion error, ignoring this line')
+		print('Err: Unicode conversion error, ignoring this line')
 	return ''
 
 
