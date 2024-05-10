@@ -64,7 +64,7 @@ def py3flushq(s):
 	#clear out the sending queue
 	#and do it in the correct order based on priority
 	while(len(send_queue)>0):
-		py3sendqueue(s)
+		py3send_queue(s)
 
 #clear the queue WITHOUT sending
 #this can LOSE output!!!
