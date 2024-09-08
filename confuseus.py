@@ -1773,6 +1773,10 @@ def handle_server_mode(sock,line):
 	#we just send a NAMES request after every mode change in a channel
 	#to get an updated list of what the modes ended up at after all was said and done
 	
+	#TODO: if we were just given ops, say thank you
+	#this requires either storing the channels we previously had ops in between NAMES calls
+	#or parsing more completely in this function
+	
 	py3queueln(sock,'NAMES '+channel,1)
 
 def run_periodic_op_rqst(sock):
