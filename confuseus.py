@@ -2123,11 +2123,11 @@ if(__name__=='__main__'):
 			db_login=markov.db_info(pg_user,pg_passwd,pg_dbname)
 			print('using postgres database '+db_login.db_name+' for input and output of state changes')
 
-		#run the markov.sql file on this database to ensure all tables are set up correctly
-		#just in case any don't already exist
-		db_handle=markov.pg_connect(db_login)
-		db_handle.execute(open('markov.sql','r').read())
-		db_handle.close()
+			#run the markov.sql file on this database to ensure all tables are set up correctly
+			#just in case any don't already exist
+			db_handle=markov.pg_connect(db_login)
+			db_handle.execute(open('markov.sql','r').read())
+			db_handle.close()
 		
 		#update tell helptext since with postgres messages actually will persist on restart
 		cmd_helptext['tell <nick> <message>']='leaves a message for a user the next time they join this channel'
